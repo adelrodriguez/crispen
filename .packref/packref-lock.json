@@ -1,3 +1,28 @@
 {
-  "packages": []
+  "packages": [
+    {
+      "name": "@tanstack/react-query",
+      "registry": "npm",
+      "source": {
+        "directory": "packages/react-query",
+        "host": "github.com",
+        "type": "repository",
+        "url": "https://github.com/TanStack/query"
+      },
+      "tracking": "manual",
+      "version": "5.101.4"
+    },
+    {
+      "name": "@tanstack/query-core",
+      "registry": "npm",
+      "source": {
+        "directory": "packages/query-core",
+        "host": "github.com",
+        "type": "repository",
+        "url": "https://github.com/TanStack/query"
+      },
+      "tracking": "manual",
+      "version": "5.101.4"
+    }
+  ]
 }
