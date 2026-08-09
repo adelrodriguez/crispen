@@ -77,12 +77,15 @@ workspaces, private, and consume the built `dist` (plan 06):
 
 ```text
 src/
-  index.ts        # core: protocol + runtime (headless)
-  protocol/       # types, descriptor, embed, http source
-  runtime/        # monitor, registry, scheduler, policies, reload guard
-  react/index.ts  # integration
-  vite/index.ts   # adapter
-  next/index.ts   # adapter
+  index.ts            # core entry: re-exports lib
+  lib/                # core: protocol + runtime (headless)
+    protocol/         # types, descriptor, embed, http source
+    runtime/          # monitor, registry, scheduler, policies, reload guard
+  integrations/
+    react/index.ts
+  adapters/
+    vite/index.ts
+    next/index.ts
 examples/
   vite-react/     # skew lab + e2e fixture (plans 04, 06)
   nextjs/         # skew lab + e2e fixture (plans 05, 06)
@@ -92,10 +95,14 @@ scripts/
 
 ```text
 crispen         → dist/index.js
-crispen/react   → dist/react/index.js   (peer: react)
-crispen/vite    → dist/vite/index.js    (peer: vite)
-crispen/next    → dist/next/index.js    (peer: next)
+crispen/react   → dist/integrations/react/index.js   (peer: react)
+crispen/vite    → dist/adapters/vite/index.js        (peer: vite)
+crispen/next    → dist/adapters/next/index.js        (peer: next)
 ```
+
+Tests are colocated: each area keeps its tests in a `__tests__/` folder next
+to the code under test (e.g. `src/lib/protocol/__tests__/descriptor.test.ts`).
+There is no top-level test directory; only e2e scenarios live outside `src`.
 
 Core and integrations must stay dependency-free at runtime. Peer dependencies
 are optional (`peerDependenciesMeta`) so installing `crispen` in a Svelte app

@@ -85,7 +85,7 @@ responsibility, per router, with the spike evidence).
 
 ## Implementation (after decisions)
 
-1. `src/next/index.ts` — `withCrispen`, plus whichever of
+1. `src/adapters/next/index.ts` — `withCrispen`, plus whichever of
    `<CrispenScript />` / route-handler export the decisions require
 2. Dev mode: same rule as all adapters — `next dev` produces no stale
    verdicts (inert embed or dev descriptor, matching plan 04's choice)

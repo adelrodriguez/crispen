@@ -6,7 +6,7 @@ Depends on plan 01 (protocol); the e2e milestone additionally needs 02 + 03.
 
 ## Deliverables
 
-1. `src/vite/index.ts` — `crispen(options?)` Vite plugin
+1. `src/adapters/vite/index.ts` — `crispen(options?)` Vite plugin
 2. e2e example app under `examples/vite-react/` (workspace, not published)
 3. Docs recipe for descriptor cache headers per host
 

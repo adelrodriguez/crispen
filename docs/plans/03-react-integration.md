@@ -10,7 +10,8 @@ Reference: `react-query/src/queryOptions.ts` (typed options helper) and
 
 ## Deliverables
 
-1. `src/react/index.ts` — `useDeploymentStatus`, `deploymentStatusOptions`,
+1. `src/integrations/react/index.ts` — `useDeploymentStatus`,
+   `deploymentStatusOptions`,
    re-exported types
 2. Tests
 3. Peer dependency wiring (`react >= 18`, optional)

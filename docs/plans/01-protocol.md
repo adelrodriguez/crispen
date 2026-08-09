@@ -5,12 +5,13 @@ package restructuring for subpath exports. No scheduling, no React, no Vite.
 
 ## Deliverables
 
-1. `src/protocol/` with types, descriptor codec, embed reader, HTTP source
+1. `src/lib/protocol/` with types, descriptor codec, embed reader, HTTP
+   source
 2. Package restructuring: exports map, bunup entries, placeholder subpath
    modules
 3. Unit tests for every parse/validate path
 
-## 1. Types (`src/protocol/types.ts`)
+## 1. Types (`src/lib/protocol/types.ts`)
 
 ```ts
 export interface Deployment {
@@ -33,7 +34,7 @@ Notes:
   the type: a source pinned to the old deployment would report its own id and
   always look current.
 
-## 2. Descriptor wire format (`src/protocol/descriptor.ts`)
+## 2. Descriptor wire format (`src/lib/protocol/descriptor.ts`)
 
 The descriptor is the JSON served at the endpoint. It is versioned and
 append-only: fields may be added, never changed or removed. Old clients run
@@ -60,7 +61,7 @@ Implement:
 - `builtAt` parses from ISO 8601; an invalid date drops the field rather
   than failing the parse (it is optional metadata).
 
-## 3. Embed convention (`src/protocol/embed.ts`)
+## 3. Embed convention (`src/lib/protocol/embed.ts`)
 
 The embed is how an adapter hands the running identity and config to the
 core without the core knowing the adapter exists. Adapters write it by any
@@ -87,7 +88,7 @@ The embed must be written before app code runs. Classic inline `<script>` in
 inject a module instead must ensure import order. This constraint is
 documented here and tested per adapter.
 
-## 4. HTTP source (`src/protocol/http-source.ts`)
+## 4. HTTP source (`src/lib/protocol/http-source.ts`)
 
 `createHttpSource(running: Deployment, endpoint: string): DeploymentSource`
 
@@ -111,8 +112,11 @@ embed endpoint or default path). This is what the registry (plan 02) uses.
 
 ## 5. Repo restructuring
 
-- `src/index.ts` re-exports protocol (runtime joins in plan 02). Delete the
-  template `main()` and its test.
+- `src/index.ts` re-exports `src/lib/protocol` (runtime joins in plan 02).
+  Delete the template `main()` and its test.
+- Tests are colocated: `__tests__/` folders next to the code under test
+  (`src/lib/protocol/__tests__/`), replacing the template's top-level
+  `src/__tests__/`.
 - `package.json`:
   - `exports` map for `.`, `./react`, `./vite`, `./next` (types + import per
     entry), `main`/`module` removed in favor of `exports`
@@ -120,8 +124,10 @@ embed endpoint or default path). This is what the registry (plan 02) uses.
     `stale-client`, `vite-plugin`, `react-hook`)
   - `peerDependencies` + `peerDependenciesMeta` (all optional): `react`,
     `vite`, `next`
-- `bunup.config.ts`: entries for all four subpaths (placeholder modules for
-  react/vite/next so builds pass before plans 03–05 land)
+- `bunup.config.ts`: entries `src/index.ts`,
+  `src/integrations/react/index.ts`, `src/adapters/vite/index.ts`,
+  `src/adapters/next/index.ts` (placeholder modules for react/vite/next so
+  builds pass before plans 03–05 land)
 - Keep knip/adamantite green: `bun run check`, `bun run analyze`
 
 ## Tests (`bun test`)

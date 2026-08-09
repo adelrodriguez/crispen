@@ -10,13 +10,15 @@ Reference before starting: `subscribable.ts`, `focusManager.ts`,
 
 ## Deliverables
 
-1. `src/runtime/subscribable.ts` — minimal subscriber base
-2. `src/runtime/monitor.ts` — `DeploymentMonitor`
-3. `src/runtime/registry.ts` — shared-monitor registry
-4. `src/runtime/scheduler.ts` — interval + browser triggers
-5. `src/runtime/policies.ts` — `exactMatch()`
-6. `src/runtime/reload-guard.ts`
-7. Public API from `crispen`: `createDeploymentMonitor`, `getDefaultMonitor`,
+1. `src/lib/runtime/subscribable.ts` — minimal subscriber base
+2. `src/lib/runtime/monitor.ts` — `DeploymentMonitor`
+3. `src/lib/runtime/registry.ts` — shared-monitor registry
+4. `src/lib/runtime/scheduler.ts` — interval + browser triggers
+5. `src/lib/runtime/policies.ts` — `exactMatch()`
+6. `src/lib/runtime/reload-guard.ts`
+7. `src/lib/runtime/environment.ts` — `RuntimeEnvironment` seam + browser
+   default (plan 06 §1)
+8. Public API from `crispen`: `createDeploymentMonitor`, `getDefaultMonitor`,
    `exactMatch`, plus all types
 
 ## 1. State model
