@@ -10,6 +10,11 @@
     "module": "esnext",
     "esModuleInterop": true,
     "moduleResolution": "bundler",
+    "paths": {
+      "crispen": ["../../src/index.ts"],
+      "crispen/next": ["../../src/adapters/next/index.ts"],
+      "crispen/react": ["../../src/integrations/react/index.ts"]
+    },
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "react-jsx",

@@ -9,5 +9,6 @@ export default {
     "src/adapters/vite/index.ts",
     "src/adapters/next/index.ts",
   ],
+  ignoreDependencies: ["tailwindcss"],
   project: ["src/**/*.ts"],
 } satisfies KnipConfig

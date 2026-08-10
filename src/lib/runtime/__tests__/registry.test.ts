@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import type { DeploymentSource } from "../../protocol"
+import type { DeploymentSource } from "../../protocol/types"
 import { getDefaultMonitor, getMonitor, resetRegistry } from "../registry"
 
 afterEach(() => {
@@ -22,6 +22,18 @@ describe("deployment monitor registry", () => {
     expect(getMonitor(firstSource)).not.toBe(getMonitor(secondSource))
   })
 
+  it("replaces a shared monitor after it is destroyed", () => {
+    const source: DeploymentSource = {
+      resolveTarget: () => Promise.resolve({ id: "first" }),
+      running: { id: "first" },
+    }
+    const monitor = getMonitor(source)
+
+    monitor.destroy()
+
+    expect(getMonitor(source)).not.toBe(monitor)
+  })
+
   it("starts a new weak registry when reset", () => {
     const source: DeploymentSource = {
       resolveTarget: () => Promise.resolve({ id: "first" }),
@@ -32,6 +44,18 @@ describe("deployment monitor registry", () => {
     resetRegistry()
 
     expect(getMonitor(source)).not.toBe(monitor)
+  })
+
+  it("replaces the default monitor after it is destroyed", () => {
+    globalThis.__CRISPEN__ = {
+      running: { id: "running" },
+      v: 1,
+    }
+    const monitor = getDefaultMonitor()
+
+    monitor.destroy()
+
+    expect(getDefaultMonitor()).not.toBe(monitor)
   })
 
   it("lazily creates one default monitor from the embed", () => {

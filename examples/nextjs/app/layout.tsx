@@ -1,5 +1,5 @@
 import { CrispenScript } from "crispen/next"
-import "@crispen/lab-ui/styles.css"
+import "../../styles.css"
 
 export const metadata = {
   description: "A visible test surface for Crispen deployment checks.",

@@ -1,23 +1,22 @@
 import type { Plugin } from "vite"
-import type { CrispenEmbed, Deployment } from "../../lib/protocol"
-import { serializeDescriptor } from "../../lib/protocol"
-import { isExternalEndpoint, resolvePublicEndpoint } from "../endpoint"
+import type { CrispenEmbed } from "../../lib/protocol/embed"
+import type { Deployment } from "../../lib/protocol/types"
+import { serializeDescriptor } from "../../lib/protocol/descriptor"
+import {
+  DEFAULT_DESCRIPTOR_ENDPOINT,
+  checkIsExternalEndpoint,
+  resolveDeploymentId,
+  resolvePublicEndpoint,
+  serializeEmbed,
+} from "../shared"
 
 export interface CrispenViteOptions {
   readonly deploymentId?: string
   readonly endpoint?: string
 }
 
-const DEPLOYMENT_ID_ENVIRONMENT_VARIABLES = [
-  "GIT_SHA",
-  "VERCEL_GIT_COMMIT_SHA",
-  "CF_PAGES_COMMIT_SHA",
-  "GITHUB_SHA",
-] as const
-const DEFAULT_ENDPOINT = "/_crispen/deployment.json"
-
 export function crispen(options: CrispenViteOptions = {}): Plugin {
-  const descriptorEndpoint = options.endpoint ?? DEFAULT_ENDPOINT
+  const descriptorEndpoint = options.endpoint ?? DEFAULT_DESCRIPTOR_ENDPOINT
   let endpoint = descriptorEndpoint
   let deployment: Deployment | undefined
 
@@ -65,7 +64,7 @@ export function crispen(options: CrispenViteOptions = {}): Plugin {
 }
 
 function descriptorFileName(endpoint: string): string | undefined {
-  if (isExternalEndpoint(endpoint)) {
+  if (checkIsExternalEndpoint(endpoint)) {
     return undefined
   }
 
@@ -78,26 +77,4 @@ function requireDeployment(deployment: Deployment | undefined): Deployment {
   }
 
   return deployment
-}
-
-function resolveDeploymentId(explicit: string | undefined): string {
-  if (explicit !== undefined && explicit.length > 0) {
-    return explicit
-  }
-
-  for (const variable of DEPLOYMENT_ID_ENVIRONMENT_VARIABLES) {
-    const value = process.env[variable]
-    if (value !== undefined && value.length > 0) {
-      return value
-    }
-  }
-
-  return crypto.randomUUID().replaceAll("-", "")
-}
-
-function serializeEmbed(embed: CrispenEmbed): string {
-  return JSON.stringify(embed, ["v", "running", "id", "builtAt", "endpoint"])
-    .replaceAll("<", "\\u003c")
-    .replaceAll("\u2028", "\\u2028")
-    .replaceAll("\u2029", "\\u2029")
 }

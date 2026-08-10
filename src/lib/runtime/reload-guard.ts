@@ -1,4 +1,4 @@
-import type { Deployment } from "../protocol"
+import type { Deployment } from "../protocol/types"
 import type { RuntimeEnvironment } from "./environment"
 
 export const RELOAD_MARKER_KEY = "crispen:reload"

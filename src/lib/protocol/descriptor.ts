@@ -1,16 +1,5 @@
 import type { Deployment } from "./types"
-
-export type DescriptorErrorReason = "invalid-json" | "unsupported-version" | "invalid-shape"
-
-export class DescriptorError extends Error {
-  override readonly name = "DescriptorError"
-  readonly reason: DescriptorErrorReason
-
-  constructor(reason: DescriptorErrorReason) {
-    super(`Invalid deployment descriptor: ${reason}`)
-    this.reason = reason
-  }
-}
+import { TargetResolutionError } from "./errors"
 
 export interface DescriptorV1 {
   readonly v: 1
@@ -40,15 +29,15 @@ export function parseDescriptor(text: string): Deployment {
   try {
     descriptor = JSON.parse(text) as DescriptorCandidate
   } catch {
-    throw new DescriptorError("invalid-json")
+    throw new TargetResolutionError("invalid-json", text)
   }
 
   if (typeof descriptor.v !== "number" || !Number.isInteger(descriptor.v) || descriptor.v < 1) {
-    throw new DescriptorError("unsupported-version")
+    throw new TargetResolutionError("unsupported-version", text)
   }
 
   if (typeof descriptor.id !== "string" || descriptor.id.length === 0) {
-    throw new DescriptorError("invalid-shape")
+    throw new TargetResolutionError("invalid-shape", text)
   }
 
   const builtAt = typeof descriptor.builtAt === "string" ? new Date(descriptor.builtAt) : undefined

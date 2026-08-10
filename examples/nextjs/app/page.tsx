@@ -1,4 +1,4 @@
-import { CrispenLab } from "@crispen/lab-ui"
+import { CrispenLab } from "../../lab"
 
 export default function Page() {
   return <CrispenLab adapter="Next.js" />

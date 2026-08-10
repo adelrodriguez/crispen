@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useRef, useSyncExternalStore } from "react"
-import type { DeploymentSource } from "../../lib/protocol"
+import type { DeploymentSource } from "../../lib/protocol/types"
 import type {
   DeploymentMonitor,
   DeploymentStatus,
@@ -72,4 +72,4 @@ export type {
   DeploymentStatus,
   DeploymentSubscriberOptions,
 } from "../../lib/runtime/monitor"
-export type { Deployment, DeploymentPolicy, DeploymentSource } from "../../lib/protocol"
+export type { Deployment, DeploymentSource, IsDeploymentCurrent } from "../../lib/protocol/types"

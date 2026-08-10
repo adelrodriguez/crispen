@@ -12,4 +12,4 @@ export interface DeploymentSource {
   resolveTarget(signal: AbortSignal): Promise<Deployment>
 }
 
-export type DeploymentPolicy = (running: Deployment, target: Deployment) => "current" | "stale"
+export type IsDeploymentCurrent = (running: Deployment, target: Deployment) => boolean

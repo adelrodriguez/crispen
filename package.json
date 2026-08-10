@@ -20,7 +20,8 @@
     "url": "https://github.com/adelrodriguez/crispen.git"
   },
   "workspaces": [
-    "examples/*"
+    "examples/nextjs",
+    "examples/vite-react"
   ],
   "files": [
     "dist"
@@ -58,7 +59,6 @@
     "test": "bun test src",
     "test:coverage": "bun test --coverage src",
     "test:e2e": "playwright test",
-    "test:exports": "bun run build && bun scripts/verify-exports.ts",
     "test:watch": "bun test --watch src",
     "version": "changeset version && bun run format"
   },

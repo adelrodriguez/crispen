@@ -1,7 +1,7 @@
 import { describe, expect, it, spyOn } from "bun:test"
-import type { DeploymentSource } from "../../protocol"
+import type { DeploymentSource } from "../../protocol/types"
+import { FakeEnvironment } from "../../test-support/fake-environment"
 import { createDeploymentMonitor } from "../monitor"
-import { FakeEnvironment } from "./fake-environment"
 
 const TEST_TIME = 10 ** 3
 
@@ -34,6 +34,20 @@ describe("deployment monitor", () => {
     expect(monitor.getState()).toBe(state)
   })
 
+  it("uses the configured isCurrent predicate", async () => {
+    const monitor = createDeploymentMonitor(
+      {
+        resolveTarget: () => Promise.resolve({ id: "running" }),
+        running: { id: "running" },
+      },
+      { isCurrent: () => false }
+    )
+
+    await monitor.check()
+
+    expect(monitor.getState().status).toBe("stale")
+  })
+
   it("keeps durable status while a successful check updates target knowledge", async () => {
     let resolveTarget: (deployment: { id: string }) => void = missingResolver
     const target = new Promise<{ id: string }>((resolve) => {
@@ -55,9 +69,10 @@ describe("deployment monitor", () => {
     })
 
     resolveTarget({ id: "running" })
-    await check
+    const result = await check
 
-    expect(monitor.getState()).toMatchObject({
+    expect(result).toBe(monitor.getState())
+    expect(result).toMatchObject({
       checkedAt: new Date(TEST_TIME),
       error: null,
       isChecking: false,
@@ -86,9 +101,10 @@ describe("deployment monitor", () => {
       status: "stale",
     })
 
-    await failedCheck
+    const result = await failedCheck
 
-    expect(monitor.getState()).toMatchObject({
+    expect(result).toBe(monitor.getState())
+    expect(result).toMatchObject({
       error: failure,
       isChecking: false,
       status: "stale",
@@ -105,8 +121,8 @@ describe("deployment monitor", () => {
     const initial = monitor.getState()
     const states: unknown[] = []
     const unsubscribe = monitor.subscribe(
-      () => {
-        states.push(monitor.getState())
+      (state) => {
+        states.push(state)
       },
       { checkOnSubscribe: false }
     )
@@ -140,7 +156,10 @@ describe("deployment monitor", () => {
     expect(calls).toBe(1)
 
     finish({ id: "running" })
-    await first
+    const [firstResult, secondResult] = await Promise.all([first, second])
+
+    expect(firstResult).toBe(monitor.getState())
+    expect(secondResult).toBe(firstResult)
   })
 
   it("aborts an in-flight check when the last subscriber leaves", async () => {
@@ -164,8 +183,9 @@ describe("deployment monitor", () => {
     await Promise.resolve()
     expect(targetSignal?.aborted).toBe(true)
 
-    await check
-    expect(monitor.getState()).toMatchObject({
+    const result = await check
+    expect(result).toBe(monitor.getState())
+    expect(result).toMatchObject({
       error: null,
       isChecking: false,
     })
@@ -180,15 +200,48 @@ describe("deployment monitor", () => {
     const monitor = createDeploymentMonitor(undefined, { environment })
     const unsubscribe = monitor.subscribe(noop)
 
-    await monitor.check()
+    const result = await monitor.check()
 
     expect(warned).toBe(false)
-    expect(monitor.getState().status).toBe("unknown")
+    expect(result).toBe(monitor.getState())
+    expect(result.status).toBe("unknown")
     expect(environment.intervalDelays).toEqual([])
     expect(environment.listenerCount("visibilitychange")).toBe(0)
 
     unsubscribe()
     warning.mockRestore()
+  })
+
+  it("stays terminal after destruction", async () => {
+    let checks = 0
+    const environment = new FakeEnvironment()
+    const monitor = createDeploymentMonitor(
+      {
+        resolveTarget: () => {
+          checks += 1
+          return Promise.resolve({ id: "running" })
+        },
+        running: { id: "running" },
+      },
+      { environment }
+    )
+    const unsubscribe = monitor.subscribe(noop, { checkOnSubscribe: false })
+
+    monitor.destroy()
+    monitor.destroy()
+    const state = monitor.getState()
+    const unsubscribeAfterDestroy = monitor.subscribe(noop)
+    const result = await monitor.check()
+    monitor.reload()
+
+    expect(result).toBe(state)
+    expect(checks).toBe(0)
+    expect(environment.intervalDelays).toEqual([])
+    expect(environment.listenerCount("visibilitychange")).toBe(0)
+    expect(environment.reloadCalls).toBe(0)
+
+    unsubscribe()
+    unsubscribeAfterDestroy()
   })
 
   it("keeps the initial check through Strict Mode subscription churn", async () => {

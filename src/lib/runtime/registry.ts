@@ -1,13 +1,20 @@
-import type { DeploymentSource } from "../protocol"
+import type { DeploymentSource } from "../protocol/types"
 import type { DeploymentMonitor } from "./monitor"
-import { createEmbeddedSource } from "../protocol"
-import { createDeploymentMonitor } from "./monitor"
+import { createEmbeddedSource } from "../protocol/http-source"
+import { createRegisteredDeploymentMonitor } from "./monitor"
 
 let defaultMonitor: DeploymentMonitor | undefined
 let monitors = new WeakMap<DeploymentSource, DeploymentMonitor>()
 
 export function getDefaultMonitor(): DeploymentMonitor {
-  defaultMonitor ??= createDeploymentMonitor(createEmbeddedSource())
+  if (defaultMonitor === undefined) {
+    const monitor = createRegisteredDeploymentMonitor(createEmbeddedSource(), () => {
+      if (defaultMonitor === monitor) {
+        defaultMonitor = undefined
+      }
+    })
+    defaultMonitor = monitor
+  }
   return defaultMonitor
 }
 
@@ -17,7 +24,11 @@ export function getMonitor(source: DeploymentSource): DeploymentMonitor {
     return existing
   }
 
-  const monitor = createDeploymentMonitor(source)
+  const monitor = createRegisteredDeploymentMonitor(source, () => {
+    if (monitors.get(source) === monitor) {
+      monitors.delete(source)
+    }
+  })
   monitors.set(source, monitor)
   return monitor
 }

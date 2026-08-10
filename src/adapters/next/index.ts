@@ -1,25 +1,37 @@
 import type { NextApiRequest, NextApiResponse, NextConfig } from "next"
 import type { ReactNode } from "react"
+import { PHASE_DEVELOPMENT_SERVER } from "next/constants.js"
 import Script from "next/script.js"
 import { createElement } from "react"
-import type { CrispenEmbed, Deployment } from "../../lib/protocol"
-import { serializeDescriptor } from "../../lib/protocol"
-import { isExternalEndpoint, resolvePublicEndpoint } from "../endpoint"
+import type { CrispenEmbed } from "../../lib/protocol/embed"
+import type { Deployment } from "../../lib/protocol/types"
+import { serializeDescriptor } from "../../lib/protocol/descriptor"
+import {
+  DEFAULT_DESCRIPTOR_ENDPOINT,
+  checkIsExternalEndpoint,
+  resolveDeploymentId,
+  resolvePublicEndpoint,
+  serializeEmbed,
+} from "../shared"
 
 export interface CrispenNextOptions {
   readonly deploymentId?: string
   readonly endpoint?: string
 }
 
+export interface NextConfigContext {
+  readonly defaultConfig: NextConfig
+}
+
+export type NextConfigFunction = (
+  phase: string,
+  context: NextConfigContext
+) => NextConfig | Promise<NextConfig>
+
+export type NextConfigExport = NextConfig | NextConfigFunction
+
 const EMBED_ENVIRONMENT_KEY = "CRISPEN_NEXT_EMBED"
 const DESCRIPTOR_ENVIRONMENT_KEY = "CRISPEN_NEXT_DESCRIPTOR"
-const DEFAULT_ENDPOINT = "/_crispen/deployment.json"
-const DEPLOYMENT_ID_ENVIRONMENT_VARIABLES = [
-  "GIT_SHA",
-  "VERCEL_GIT_COMMIT_SHA",
-  "CF_PAGES_COMMIT_SHA",
-  "GITHUB_SHA",
-] as const
 
 export function CrispenScript(): ReactNode {
   const embed = process.env[EMBED_ENVIRONMENT_KEY]
@@ -29,7 +41,7 @@ export function CrispenScript(): ReactNode {
 
   return createElement(Script, {
     dangerouslySetInnerHTML: {
-      __html: `globalThis.__CRISPEN__=${escapeScriptText(embed)}`,
+      __html: `globalThis.__CRISPEN__=${embed}`,
     },
     id: "crispen-deployment",
     strategy: "beforeInteractive",
@@ -57,51 +69,53 @@ export function crispenPagesHandler(_request: NextApiRequest, response: NextApiR
     .end(descriptor ?? '{"error":"descriptor unavailable"}')
 }
 
-export function withCrispen(config: NextConfig = {}, options: CrispenNextOptions = {}): NextConfig {
-  const configuredEndpoint = options.endpoint ?? DEFAULT_ENDPOINT
-  const basePath = config.basePath ?? ""
-  const endpoint = resolvePublicEndpoint(basePath, configuredEndpoint)
-  const deployment: Deployment = {
-    builtAt: new Date(),
-    id: resolveDeploymentId(options.deploymentId ?? config.deploymentId),
-  }
-  const embed: CrispenEmbed = {
-    endpoint,
-    running: {
-      builtAt: deployment.builtAt?.toISOString(),
-      id: deployment.id,
-    },
-    v: 1,
-  }
-  const descriptorHeader = createDescriptorHeader(endpoint, basePath.length > 0)
-  const development = isNextDevelopmentCommand()
+export function withCrispen(
+  config: NextConfigExport = {},
+  options: CrispenNextOptions = {}
+): NextConfigFunction {
+  return async (phase, context) => {
+    const resolvedConfig = typeof config === "function" ? await config(phase, context) : config
+    const configuredEndpoint = options.endpoint ?? DEFAULT_DESCRIPTOR_ENDPOINT
+    const basePath = resolvedConfig.basePath ?? ""
+    const endpoint = resolvePublicEndpoint(basePath, configuredEndpoint)
+    const deployment: Deployment = {
+      builtAt: new Date(),
+      id: resolveDeploymentId(options.deploymentId ?? resolvedConfig.deploymentId),
+    }
+    const embed: CrispenEmbed = {
+      endpoint,
+      running: {
+        builtAt: deployment.builtAt?.toISOString(),
+        id: deployment.id,
+      },
+      v: 1,
+    }
+    const descriptorHeader = createDescriptorHeader(endpoint, basePath.length > 0)
+    const development = phase === PHASE_DEVELOPMENT_SERVER
 
-  return {
-    ...config,
-    env: {
-      ...config.env,
-      [DESCRIPTOR_ENVIRONMENT_KEY]: development ? "" : serializeDescriptor(deployment),
-      [EMBED_ENVIRONMENT_KEY]: development ? "" : JSON.stringify(embed),
-    },
-    headers:
-      descriptorHeader === undefined
-        ? config.headers
-        : async () => [
-            ...(config.headers === undefined ? [] : await config.headers()),
-            descriptorHeader,
-          ],
+    return {
+      ...resolvedConfig,
+      env: {
+        ...resolvedConfig.env,
+        [DESCRIPTOR_ENVIRONMENT_KEY]: development ? "" : serializeDescriptor(deployment),
+        [EMBED_ENVIRONMENT_KEY]: development ? "" : serializeEmbed(embed),
+      },
+      headers:
+        descriptorHeader === undefined
+          ? resolvedConfig.headers
+          : async () => [
+              ...(resolvedConfig.headers === undefined ? [] : await resolvedConfig.headers()),
+              descriptorHeader,
+            ],
+    }
   }
-}
-
-function isNextDevelopmentCommand(): boolean {
-  return process.argv.some((argument) => argument === "dev" || argument === "next-dev")
 }
 
 function createDescriptorHeader(
   endpoint: string,
   hasBasePath: boolean
 ): Awaited<ReturnType<NonNullable<NextConfig["headers"]>>>[number] | undefined {
-  if (isExternalEndpoint(endpoint)) {
+  if (checkIsExternalEndpoint(endpoint)) {
     return undefined
   }
 
@@ -110,26 +124,4 @@ function createDescriptorHeader(
     headers: [{ key: "Cache-Control", value: "no-store" }],
     source: endpoint,
   }
-}
-
-function resolveDeploymentId(explicit: string | undefined): string {
-  if (explicit !== undefined && explicit.length > 0) {
-    return explicit
-  }
-
-  for (const variable of DEPLOYMENT_ID_ENVIRONMENT_VARIABLES) {
-    const value = process.env[variable]
-    if (value !== undefined && value.length > 0) {
-      return value
-    }
-  }
-
-  return crypto.randomUUID().replaceAll("-", "")
-}
-
-function escapeScriptText(value: string): string {
-  return value
-    .replaceAll("<", "\\u003c")
-    .replaceAll("\u2028", "\\u2028")
-    .replaceAll("\u2029", "\\u2029")
 }

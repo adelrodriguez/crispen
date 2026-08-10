@@ -1,6 +1,9 @@
 import { defineConfig } from "bunup"
 
 export default defineConfig({
+  define: {
+    "process.env.NODE_ENV": "process.env.NODE_ENV",
+  },
   dts: true,
   entry: [
     "src/index.ts",
@@ -11,5 +14,5 @@ export default defineConfig({
   format: "esm",
   outDir: "dist",
   sourcemap: true,
-  target: "node",
+  target: "browser",
 })

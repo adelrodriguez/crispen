@@ -18,7 +18,7 @@ export function readEmbed(): CrispenEmbed | undefined {
     return undefined
   }
 
-  if (!isEmbed(embed)) {
+  if (!checkIsEmbed(embed)) {
     if (process.env.NODE_ENV !== "production") {
       // eslint-disable-next-line no-console -- Invalid build-time data must be visible in development.
       console.warn("Crispen ignored a malformed deployment embed.")
@@ -30,22 +30,26 @@ export function readEmbed(): CrispenEmbed | undefined {
   return embed
 }
 
-function isEmbed(value: unknown): value is CrispenEmbed {
+function checkIsEmbed(value: unknown): value is CrispenEmbed {
   if (typeof value !== "object" || value === null) {
     return false
   }
 
-  const candidate = value as Record<string, unknown>
-  const running = candidate.running
+  const { v, running, endpoint } = value as Record<string, unknown>
+
+  if (v !== 1 || (endpoint !== undefined && typeof endpoint !== "string")) {
+    return false
+  }
+
+  if (typeof running !== "object" || running === null) {
+    return false
+  }
+
+  const { id, builtAt } = running as Record<string, unknown>
 
   return (
-    candidate.v === 1 &&
-    typeof running === "object" &&
-    running !== null &&
-    typeof (running as Record<string, unknown>).id === "string" &&
-    ((running as Record<string, unknown>).id as string).length > 0 &&
-    ((running as Record<string, unknown>).builtAt === undefined ||
-      typeof (running as Record<string, unknown>).builtAt === "string") &&
-    (candidate.endpoint === undefined || typeof candidate.endpoint === "string")
+    typeof id === "string" &&
+    id.length > 0 &&
+    (builtAt === undefined || typeof builtAt === "string")
   )
 }

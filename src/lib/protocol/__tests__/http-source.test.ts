@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, spyOn } from "bun:test"
-import { createEmbeddedSource, createHttpSource, TargetResolutionError } from "../http-source"
+import { TargetResolutionError } from "../errors"
+import { createEmbeddedSource, createHttpSource } from "../http-source"
 
 afterEach(() => {
   globalThis.fetch = originalFetch
@@ -37,40 +38,62 @@ describe("HTTP deployment source", () => {
     })
   })
 
+  it("passes request settings to a custom fetch implementation", async () => {
+    const customFetch = spyOn({ fetch: originalFetch }, "fetch").mockResolvedValue(
+      new Response('{"v":1,"id":"target"}', {
+        headers: { "content-type": "application/json" },
+      })
+    )
+    const source = createHttpSource({ id: "running" }, "/deployment.json", {
+      credentials: "include",
+      fetch: customFetch,
+      headers: { authorization: "Bearer token" },
+    })
+    const controller = new AbortController()
+
+    await source.resolveTarget(controller.signal)
+
+    expect(customFetch).toHaveBeenCalledWith("/deployment.json", {
+      cache: "no-store",
+      credentials: "include",
+      headers: { authorization: "Bearer token" },
+      signal: controller.signal,
+    })
+  })
+
   it("reports a network failure with its typed reason", async () => {
-    spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("offline"))
+    const cause = new TypeError("offline")
+    spyOn(globalThis, "fetch").mockRejectedValue(cause)
     const source = createHttpSource({ id: "running" }, "/deployment.json")
 
     const error = await getRejection(source.resolveTarget(new AbortController().signal))
 
-    expect(error).toEqual(new TargetResolutionError("network"))
+    expect(error).toEqual(new TargetResolutionError("network", cause))
   })
 
   it("rejects an unsuccessful HTTP response before reading its body", async () => {
-    spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response('{"v":1,"id":"target"}', {
-        headers: { "content-type": "application/json" },
-        status: 503,
-      })
-    )
+    const response = new Response('{"v":1,"id":"target"}', {
+      headers: { "content-type": "application/json" },
+      status: 503,
+    })
+    spyOn(globalThis, "fetch").mockResolvedValue(response)
     const source = createHttpSource({ id: "running" }, "/deployment.json")
 
     const error = await getRejection(source.resolveTarget(new AbortController().signal))
 
-    expect(error).toEqual(new TargetResolutionError("http-status"))
+    expect(error).toEqual(new TargetResolutionError("http-status", response))
   })
 
   it("rejects an HTML SPA fallback before descriptor parsing", async () => {
-    spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response("<!doctype html><title>App</title>", {
-        headers: { "content-type": "text/html" },
-      })
-    )
+    const response = new Response("<!doctype html><title>App</title>", {
+      headers: { "content-type": "text/html" },
+    })
+    spyOn(globalThis, "fetch").mockResolvedValue(response)
     const source = createHttpSource({ id: "running" }, "/deployment.json")
 
     const error = await getRejection(source.resolveTarget(new AbortController().signal))
 
-    expect(error).toEqual(new TargetResolutionError("not-json"))
+    expect(error).toEqual(new TargetResolutionError("not-json", response))
   })
 
   it("propagates an abort from fetch", async () => {

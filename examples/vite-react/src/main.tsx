@@ -1,7 +1,7 @@
-import { CrispenLab } from "@crispen/lab-ui"
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
-import "@crispen/lab-ui/styles.css"
+import { CrispenLab } from "../../lab"
+import "../../styles.css"
 
 const root = document.querySelector("#root")
 if (root === null) {

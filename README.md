@@ -48,7 +48,7 @@ export function UpdateNotice() {
 
   return (
     <aside>
-      <p>A new version is available.</p>
+      <p>A new version is available: {deployment.target.id}</p>
       <button type="button" onClick={deployment.reload}>
         Reload
       </button>
@@ -64,7 +64,32 @@ The Vite adapter does these operations during a production build:
 - It uses `deploymentId`, then `GIT_SHA`, `VERCEL_GIT_COMMIT_SHA`,
   `CF_PAGES_COMMIT_SHA`, or `GITHUB_SHA`. It uses a random UUID last.
 
-The adapter is inert during `vite dev`.
+The adapter is inert during `vite dev`. Use a static source to exercise your
+`current` and `stale` interface states without a production build:
+
+```tsx
+import { createStaticSource } from "crispen"
+import { useDeploymentStatus } from "crispen/react"
+
+const developmentSource = import.meta.env.DEV
+  ? createStaticSource({ id: "dev-running" }, { id: "dev-target" })
+  : undefined
+
+export function UpdateNotice() {
+  const deployment = useDeploymentStatus({ source: developmentSource })
+
+  if (deployment.status !== "stale") {
+    return null
+  }
+
+  return <p>A new version is available.</p>
+}
+```
+
+Keep the source at module scope so that renders use one shared monitor. Use the
+same deployment ID for both arguments to simulate `current`. Use different IDs
+to simulate `stale`.
+
 When you set Vite `base`, the adapter adds it to the default descriptor endpoint.
 A local explicit `endpoint` is relative to that base. An external endpoint stays
 unchanged. For a relative or full-URL base, the local endpoint stays
@@ -133,7 +158,9 @@ export { crispenPagesHandler as default } from "crispen/next"
 value can conflict with host skew protection. It adds the Crispen environment
 values and a `no-store` header rule for a local endpoint. When you set Next.js
 `basePath`, the adapter adds it to local default and explicit descriptor
-endpoints. An external endpoint stays unchanged. `next dev` is inert.
+endpoints. An external endpoint stays unchanged. `next dev` is inert. To use
+the static-source pattern in Next.js, select the source with
+`process.env.NODE_ENV === "development"` instead of `import.meta.env.DEV`.
 
 Next.js does not apply `headers()` rules to `output: "export"`. For a static
 export, add the descriptor cache rule in your hosting platform. See
@@ -160,7 +187,8 @@ const deployment = useDeploymentStatus({
 ```
 
 Inline option objects are shallow-stabilized, so they do not cause needless
-subscriptions.
+subscriptions. `source` and `isCurrent` are compared by reference, so hoist or
+memoize them when you pass your own.
 
 The options are:
 
@@ -170,22 +198,22 @@ The options are:
 | `checkOnReconnect` | `true`          | Check when the browser returns online.                       |
 | `checkOnSubscribe` | `true`          | Check when the first subscriber attaches.                    |
 | `checkOnVisible`   | `true`          | Check when the page becomes visible or returns from bfcache. |
-| `policy`           | `exactMatch()`  | Classify the running and target deployments.                 |
+| `isCurrent`        | exact ID match  | Return whether the running deployment is current.            |
 | `source`           | embedded source | Use a custom `DeploymentSource`.                             |
 
 `DeploymentStatus` has these fields:
 
-| Field           | Type                                | Meaning                                                                                                            |
-| --------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `status`        | `"unknown" \| "current" \| "stale"` | Last successful policy result.                                                                                     |
-| `isChecking`    | `boolean`                           | A target check is active.                                                                                          |
-| `error`         | `Error \| null`                     | The last resolution error. A failed check does not erase durable status.                                           |
-| `running`       | `Deployment`                        | Identity embedded in the current page.                                                                             |
-| `target`        | `Deployment \| null`                | Last successfully resolved target.                                                                                 |
-| `checkedAt`     | `Date \| null`                      | Time of the last successful check.                                                                                 |
-| `reloadBlocked` | `boolean`                           | The reload guard stopped a repeated mixed-version loop. The guard is inactive when session storage is unavailable. |
-| `check()`       | `Promise<void>`                     | Check now. It never rejects.                                                                                       |
-| `reload()`      | `void`                              | Request a guarded page reload.                                                                                     |
+| Field           | Type                                         | Meaning                                                                                                            |
+| --------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `status`        | `"unknown" \| "current" \| "stale"`          | Last successful deployment comparison.                                                                             |
+| `isChecking`    | `boolean`                                    | A target check is active.                                                                                          |
+| `error`         | `Error \| null`                              | The last resolution error. A failed check does not erase durable status.                                           |
+| `running`       | `Deployment`                                 | Identity embedded in the current page.                                                                             |
+| `target`        | `null` for `unknown`; otherwise `Deployment` | Last successfully resolved target. `status` narrows this field.                                                    |
+| `checkedAt`     | `null` for `unknown`; otherwise `Date`       | Time of the last successful check. `status` narrows this field.                                                    |
+| `reloadBlocked` | `boolean`                                    | The reload guard stopped a repeated mixed-version loop. The guard is inactive when session storage is unavailable. |
+| `check()`       | `Promise<void>`                              | Check now. It never rejects.                                                                                       |
+| `reload()`      | `void`                                       | Request a guarded page reload.                                                                                     |
 
 ## Headless API
 
@@ -196,7 +224,11 @@ import { createDeploymentMonitor, createHttpSource } from "crispen"
 
 const source = createHttpSource(
   { id: "running-release" },
-  "https://deployments.example.com/current.json"
+  "https://deployments.example.com/current.json",
+  {
+    credentials: "include",
+    headers: { authorization: "Bearer token" },
+  }
 )
 const monitor = createDeploymentMonitor(source)
 
@@ -213,23 +245,29 @@ The headless exports are:
 
 - `createDeploymentMonitor(source?, options?)` creates an independent
   monitor. `options.environment` supplies the deterministic runtime seam,
-  and `options.policy` changes the default policy.
+  and `options.isCurrent` changes how deployments are compared.
 - `getDefaultMonitor()` returns the lazy monitor from the build embed.
 - `getMonitor(source)` returns one shared monitor for each source object.
-- `exactMatch()` returns the v1 identity policy.
-- `createHttpSource(running, endpoint)` creates a no-cache HTTP source.
+
+- `createHttpSource(running, endpoint, init?)` creates a no-cache HTTP source.
+  `init` accepts fetch request settings and an optional custom `fetch` function.
+  Crispen always controls `cache` and `signal`.
+- `createStaticSource(running, target)` creates a fixed source for development,
+  previews, and tests.
 - `createEmbeddedSource()` creates a source from `globalThis.__CRISPEN__`, or
   returns `undefined` when no valid embed exists.
 - `createBrowserEnvironment()` is not public. Implement `RuntimeEnvironment`
   only for tests or a non-browser runtime and pass it to the monitor.
 
 `DeploymentMonitor` provides `getState`, `subscribe`, `check`, `reload`, and
-`destroy`. Subscriber options use the same schedule fields as the React hook.
+`destroy`. Destruction is terminal: later subscriptions, checks, and reloads
+are inert. A registry lookup after destruction returns a new monitor.
+Subscriber options use the same schedule fields as the React hook.
 When several subscribers differ, Crispen uses the shortest interval and the
-union of enabled triggers. The first supplied subscriber policy has priority.
+union of enabled triggers. The first supplied subscriber `isCurrent` predicate has priority.
 
 The root also exports these types: `Deployment`, `DeploymentSource`,
-`DeploymentPolicy`, `DeploymentStatus`, `DeploymentMonitor`,
+`HttpSourceInit`, `IsDeploymentCurrent`, `DeploymentStatus`, `DeploymentMonitor`,
 `DeploymentMonitorOptions`, `DeploymentSubscriberOptions`,
 `RuntimeEnvironment`, `RuntimeEvent`, `RuntimeEventType`, and
 `RuntimeStorage`.
@@ -354,7 +392,6 @@ Run all checks with:
 bun run check
 bun run test
 bun run test:e2e
-bun run test:exports
 bun run build
 bun run analyze
 ```
