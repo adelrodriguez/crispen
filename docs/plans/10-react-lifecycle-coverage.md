@@ -3,7 +3,7 @@
 Complete focused React coverage for option changes and `reload()` while keeping
 all scheduling and state logic in the headless runtime.
 
-Depends on the shared monitor policy in plan 08.
+Depends on the current shared monitor predicate policy.
 
 ## Scope
 
@@ -40,8 +40,8 @@ the three cases define the lifecycle contract:
 - changed options become effective
 - Strict Mode churn does not duplicate a check or lose the subscription
 
-If the test uses two components, follow the predicate priority contract from
-plan 08 explicitly. Do not rely on an unspecified render order.
+If the test uses two components, give the earliest currently active subscriber
+predicate priority. Do not rely on an unspecified render order.
 
 ## 2. `reload()` through the hook
 
@@ -53,7 +53,7 @@ known. Then invoke the action and assert observable runtime effects:
 
 - the reload marker is written to session storage
 - the browser reload operation is requested once
-- the component receives `reloadBlocked` if the guard blocks a later attempt
+- the component receives `reloadStatus: "blocked"` if the guard blocks a later attempt
 
 Prefer observable effects over spying on a bound function reference. Restore all
 browser globals and storage after the test.
@@ -77,11 +77,10 @@ Any new test-only registry seam must:
 
 ## Sequencing
 
-1. Complete the predicate contract and tests from plan 08.
-2. Add the options-change component test.
-3. Add the hook reload action test.
-4. Run the focused React tests.
-5. Run the runtime tests and Playwright deployment test to check both sides of
+1. Add the options-change component test.
+2. Add the hook reload action test.
+3. Run the focused React tests.
+4. Run the runtime tests and Playwright deployment test to check both sides of
    the integration boundary.
 
 ## Acceptance

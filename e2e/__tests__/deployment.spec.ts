@@ -32,7 +32,7 @@ test("blocks a mixed-version reload loop", async ({ page }, testInfo) => {
 
   await attemptReload(page, 3)
 
-  await expect(page.getByTestId("reload-blocked")).toHaveText("yes")
+  await expect(page.getByTestId("reload-status")).toHaveText("blocked")
 })
 
 test("surfaces an SPA fallback without changing durable status", async ({ page }, testInfo) => {

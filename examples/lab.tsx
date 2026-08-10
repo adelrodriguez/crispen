@@ -99,11 +99,11 @@ export function CrispenLab({ adapter }: { readonly adapter: "Next.js" | "Vite" }
           <article className={`${PANEL_CLASS} min-h-84 p-5`}>
             <h2 className="mb-3 text-[0.85rem] tracking-[0.08em] uppercase">State axes</h2>
             <dl className="mb-5 grid grid-cols-2">
-              <Reading label="Checking" value={deployment.isChecking ? "yes" : "no"} />
+              <Reading label="Check status" value={deployment.checkStatus} />
               <Reading
-                label="Reload blocked"
-                testId="reload-blocked"
-                value={deployment.reloadBlocked ? "yes" : "no"}
+                label="Reload status"
+                testId="reload-status"
+                value={deployment.reloadStatus}
               />
               <Reading
                 label="Checked at"
@@ -116,9 +116,9 @@ export function CrispenLab({ adapter }: { readonly adapter: "Next.js" | "Vite" }
                 type="button"
                 className={BUTTON_CLASS}
                 onClick={() => void deployment.check()}
-                disabled={deployment.isChecking}
+                disabled={deployment.checkStatus === "checking"}
               >
-                {deployment.isChecking ? "Checking…" : "Check now"}
+                {deployment.checkStatus === "checking" ? "Checking…" : "Check now"}
               </button>
               <button
                 type="button"

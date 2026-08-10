@@ -22,7 +22,7 @@ afterAll(async () => {
 
 function Status(): React.ReactNode {
   const deployment = useDeploymentStatus({ checkOnSubscribe: false })
-  return <output>{deployment.status}</output>
+  return <output>{`${deployment.status}:${deployment.reloadStatus}`}</output>
 }
 
 function SourceStatus({
@@ -49,13 +49,13 @@ function missingResolver(): never {
 }
 
 describe("React deployment integration", () => {
-  it("renders unknown without an embed in the browser and during SSR", () => {
+  it("renders unknown with the browser and server reload status", () => {
     const warning = spyOn(console, "warn").mockImplementation(() => false)
 
     const view = render(<Status />)
 
-    expect(view.getByText("unknown")).toBeDefined()
-    expect(renderToString(<Status />)).toContain("unknown")
+    expect(view.getByText("unknown:ready")).toBeDefined()
+    expect(renderToString(<Status />)).toContain("unknown:unprotected")
     expect(warning).toHaveBeenCalled()
     warning.mockRestore()
   })
@@ -185,7 +185,7 @@ describe("React deployment integration", () => {
     })
 
     expect(view.getByText("stale")).toBeDefined()
-    expect(states.get("notice")?.isChecking).toBe(true)
+    expect(states.get("notice")?.checkStatus).toBe("checking")
 
     finish({ id: "target" })
     await act(async () => {
