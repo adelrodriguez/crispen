@@ -1,1 +1,1 @@
-export * from "../../dist/adapters/vite/index"
+export * from "../../src/adapters/vite/index"

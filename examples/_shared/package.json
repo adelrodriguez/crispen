@@ -4,7 +4,10 @@
   "type": "module",
   "exports": {
     ".": "./src/app.tsx",
-    "./styles.css": "./src/styles.css"
+    "./styles.css": {
+      "types": "./src/styles.d.ts",
+      "default": "./src/styles.css"
+    }
   },
   "dependencies": {
     "crispen": "workspace:*",

@@ -66,7 +66,7 @@ export function CrispenLab({ adapter }: { readonly adapter: "Next.js" | "Vite" }
         <Identity
           label="Running deployment"
           testId="running-id"
-          value={deployment.running.id || "not embedded"}
+          value={deployment.running.id === "" ? "not embedded" : deployment.running.id}
         />
         <div className="rail-connector" aria-hidden="true">
           <span>target check</span>

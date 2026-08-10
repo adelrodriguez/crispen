@@ -1,1 +1,1 @@
-export * from "../../dist/integrations/react/index"
+export * from "../../src/integrations/react/index"

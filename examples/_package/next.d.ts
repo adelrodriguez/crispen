@@ -1,1 +1,1 @@
-export * from "../../dist/adapters/next/index"
+export * from "../../src/adapters/next/index"
