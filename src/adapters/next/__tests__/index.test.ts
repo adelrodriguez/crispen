@@ -93,6 +93,25 @@ describe("Next adapter", () => {
     }
   })
 
+  it("resolves a deployment id strategy through the adapter options", async () => {
+    const previousCommitRef = process.env.COMMIT_REF
+    process.env.COMMIT_REF = "netlify-sha"
+
+    try {
+      const wrapped = await resolveNextConfig(
+        withCrispen({}, { deploymentId: { platform: "netlify" } })
+      )
+
+      expect(wrapped.env?.CRISPEN_NEXT_EMBED).toContain('"id":"netlify-sha"')
+    } finally {
+      if (previousCommitRef === undefined) {
+        Reflect.deleteProperty(process.env, "COMMIT_REF")
+      } else {
+        process.env.COMMIT_REF = previousCommitRef
+      }
+    }
+  })
+
   it("prefixes the default endpoint with the Next base path", async () => {
     const wrapped = await resolveNextConfig(
       withCrispen({ basePath: "/app" }, { deploymentId: "A" })

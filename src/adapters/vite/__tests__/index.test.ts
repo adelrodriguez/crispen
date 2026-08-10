@@ -8,10 +8,15 @@ import { crispen } from "../index"
 
 const temporaryDirectories: string[] = []
 const deploymentEnvironmentVariables = [
-  "GIT_SHA",
-  "VERCEL_GIT_COMMIT_SHA",
+  "CF_PAGES",
   "CF_PAGES_COMMIT_SHA",
+  "COMMIT_REF",
+  "GIT_SHA",
+  "GITHUB_ACTIONS",
   "GITHUB_SHA",
+  "NETLIFY",
+  "VERCEL",
+  "VERCEL_GIT_COMMIT_SHA",
 ] as const
 const originalEnvironment = new Map(
   deploymentEnvironmentVariables.map((key) => [key, process.env[key]])
@@ -71,33 +76,43 @@ describe("Vite adapter", () => {
     expect(parseDescriptor(descriptor).id).toBe("A")
   })
 
-  it("prefers an explicit id, then the documented CI environment order", async () => {
+  it("prefers an explicit id, then the detected platform, GIT_SHA, and a random ID", async () => {
+    for (const key of deploymentEnvironmentVariables) {
+      Reflect.deleteProperty(process.env, key)
+    }
     process.env.GIT_SHA = "git"
+    process.env.GITHUB_SHA = "stray"
+    process.env.VERCEL = "1"
     process.env.VERCEL_GIT_COMMIT_SHA = "vercel"
-    process.env.CF_PAGES_COMMIT_SHA = "cloudflare"
-    process.env.GITHUB_SHA = "github"
 
     const explicit = await buildFixture({ deploymentId: "explicit" })
     expect(parseDescriptor(explicit.descriptor).id).toBe("explicit")
 
+    const vercel = await buildFixture({})
+    expect(parseDescriptor(vercel.descriptor).id).toBe("vercel")
+
+    delete process.env.VERCEL
+    delete process.env.VERCEL_GIT_COMMIT_SHA
     const git = await buildFixture({})
     expect(parseDescriptor(git.descriptor).id).toBe("git")
 
     delete process.env.GIT_SHA
-    const vercel = await buildFixture({})
-    expect(parseDescriptor(vercel.descriptor).id).toBe("vercel")
-
-    delete process.env.VERCEL_GIT_COMMIT_SHA
-    const cloudflare = await buildFixture({})
-    expect(parseDescriptor(cloudflare.descriptor).id).toBe("cloudflare")
-
-    delete process.env.CF_PAGES_COMMIT_SHA
-    const github = await buildFixture({})
-    expect(parseDescriptor(github.descriptor).id).toBe("github")
-
     delete process.env.GITHUB_SHA
     const random = await buildFixture({})
     expect(parseDescriptor(random.descriptor).id).toMatch(/^[\da-f]{32}$/u)
+  })
+
+  it("resolves a deployment id strategy through the plugin options", async () => {
+    for (const key of deploymentEnvironmentVariables) {
+      Reflect.deleteProperty(process.env, key)
+    }
+    process.env.COMMIT_REF = "netlify-sha"
+
+    const platform = await buildFixture({ deploymentId: { platform: "netlify" } })
+    expect(parseDescriptor(platform.descriptor).id).toBe("netlify-sha")
+
+    const resolver = await buildFixture({ deploymentId: () => "resolved" })
+    expect(parseDescriptor(resolver.descriptor).id).toBe("resolved")
   })
 
   it("escapes the embed for an HTML script context", async () => {

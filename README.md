@@ -61,8 +61,26 @@ The Vite adapter does these operations during a production build:
 
 - It embeds the running deployment before application scripts.
 - It emits `/_crispen/deployment.json` with the same identity.
-- It uses `deploymentId`, then `GIT_SHA`, `VERCEL_GIT_COMMIT_SHA`,
-  `CF_PAGES_COMMIT_SHA`, or `GITHUB_SHA`. It uses a random UUID last.
+- It uses `deploymentId`, then the commit SHA of a detected platform, then
+  `GIT_SHA`. It uses a random UUID last.
+
+Both adapters resolve the deployment ID the same way. Without `deploymentId`,
+they detect the build platform from its marker variable — Vercel, Cloudflare
+Pages, Netlify, or GitHub Actions — and read that platform's commit SHA, so a
+stray CI variable from another platform cannot win. `deploymentId` also accepts
+a strategy instead of a literal ID:
+
+```ts
+crispen({ deploymentId: { platform: "vercel" } })
+crispen({ deploymentId: { env: "RELEASE_ID" } })
+crispen({ deploymentId: { env: ["RELEASE_ID", "GIT_SHA"] } })
+crispen({ deploymentId: () => readGitSha() })
+```
+
+A platform strategy skips detection and reads the platform's commit SHA
+directly. An `env` strategy reads the first non-empty variable. When an
+explicit strategy resolves nothing, the adapter warns during the build and uses
+a random UUID.
 
 The adapter is inert during `vite dev`. Use a static source to exercise your
 `current` and `stale` interface states without a production build:
