@@ -4,7 +4,7 @@ import { createEmbeddedSource } from "../protocol"
 import { createDeploymentMonitor } from "./monitor"
 
 let defaultMonitor: DeploymentMonitor | undefined
-const monitors = new Map<DeploymentSource, DeploymentMonitor>()
+let monitors = new WeakMap<DeploymentSource, DeploymentMonitor>()
 
 export function getDefaultMonitor(): DeploymentMonitor {
   defaultMonitor ??= createDeploymentMonitor(createEmbeddedSource())
@@ -26,8 +26,5 @@ export function resetRegistry(): void {
   defaultMonitor?.destroy()
   defaultMonitor = undefined
 
-  for (const monitor of monitors.values()) {
-    monitor.destroy()
-  }
-  monitors.clear()
+  monitors = new WeakMap()
 }

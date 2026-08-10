@@ -13,14 +13,19 @@ const DEPLOYMENT_ID_ENVIRONMENT_VARIABLES = [
   "CF_PAGES_COMMIT_SHA",
   "GITHUB_SHA",
 ] as const
+const DEFAULT_ENDPOINT = "/_crispen/deployment.json"
 
 export function crispen(options: CrispenViteOptions = {}): Plugin {
-  const endpoint = options.endpoint ?? "/_crispen/deployment.json"
+  const descriptorEndpoint = options.endpoint ?? DEFAULT_ENDPOINT
+  let endpoint = descriptorEndpoint
   let deployment: Deployment | undefined
 
   return {
     apply: "build",
-    configResolved() {
+    configResolved(config) {
+      if (options.endpoint === undefined) {
+        endpoint = prefixBase(config.base, DEFAULT_ENDPOINT)
+      }
       deployment = {
         builtAt: new Date(),
         id: resolveDeploymentId(options.deploymentId),
@@ -28,7 +33,7 @@ export function crispen(options: CrispenViteOptions = {}): Plugin {
     },
     generateBundle() {
       const currentDeployment = requireDeployment(deployment)
-      const fileName = descriptorFileName(endpoint)
+      const fileName = descriptorFileName(descriptorEndpoint)
       if (fileName !== undefined) {
         this.emitFile({
           fileName,
@@ -88,7 +93,15 @@ function resolveDeploymentId(explicit: string | undefined): string {
     }
   }
 
-  return crypto.randomUUID()
+  return crypto.randomUUID().replaceAll("-", "")
+}
+
+function prefixBase(base: string, endpoint: string): string {
+  if (base.length === 0 || base === "/") {
+    return endpoint
+  }
+
+  return `${base.replace(/\/+$/u, "")}${endpoint}`
 }
 
 function serializeEmbed(embed: CrispenEmbed): string {

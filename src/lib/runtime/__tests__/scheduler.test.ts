@@ -70,6 +70,29 @@ describe("deployment scheduler", () => {
     unsubscribeSlow()
   })
 
+  it("keeps the interval when subscriber churn does not change the schedule", () => {
+    const environment = new FakeEnvironment()
+    const monitor = createDeploymentMonitor(
+      {
+        resolveTarget: () => Promise.resolve({ id: "running" }),
+        running: { id: "running" },
+      },
+      { environment }
+    )
+    const options = {
+      checkInterval: 20_000,
+      checkOnSubscribe: false,
+    }
+    const unsubscribeFirst = monitor.subscribe(noop, options)
+    const unsubscribeSecond = monitor.subscribe(noop, options)
+
+    expect(environment.intervalStarts).toBe(1)
+
+    unsubscribeSecond()
+    expect(environment.intervalStarts).toBe(1)
+    unsubscribeFirst()
+  })
+
   it("checks on visible, persisted page restore, reconnect, and visible intervals", async () => {
     let checks = 0
     const environment = new FakeEnvironment()

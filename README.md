@@ -65,6 +65,8 @@ The Vite adapter does these operations during a production build:
   `CF_PAGES_COMMIT_SHA`, or `GITHUB_SHA`. It uses a random UUID last.
 
 The adapter is inert during `vite dev`.
+When you set Vite `base`, the adapter adds it to the default descriptor endpoint.
+An explicit `endpoint` stays unchanged.
 
 ```ts
 crispen({
@@ -124,10 +126,12 @@ the handler:
 export { crispenPagesHandler as default } from "crispen/next"
 ```
 
-`withCrispen` preserves user config values, `generateBuildId`, `env`, and
-`headers()`. It sets Next.js `deploymentId`, adds the Crispen environment
-values, and adds a `no-store` header rule for a local endpoint. `next dev` is
-inert.
+`withCrispen` preserves user config values, `generateBuildId`, `deploymentId`,
+`env`, and `headers()`. It does not set Next.js `deploymentId`, because that
+value can conflict with host skew protection. It adds the Crispen environment
+values and a `no-store` header rule for a local endpoint. When you set Next.js
+`basePath`, the adapter adds it to the default descriptor endpoint. An explicit
+`endpoint` stays unchanged. `next dev` is inert.
 
 Next.js does not apply `headers()` rules to `output: "export"`. For a static
 export, add the descriptor cache rule in your hosting platform. See
@@ -172,17 +176,17 @@ The options are:
 
 `DeploymentStatus` has these fields:
 
-| Field           | Type                                | Meaning                                                                  |
-| --------------- | ----------------------------------- | ------------------------------------------------------------------------ |
-| `status`        | `"unknown" \| "current" \| "stale"` | Last successful policy result.                                           |
-| `isChecking`    | `boolean`                           | A target check is active.                                                |
-| `error`         | `Error \| null`                     | The last resolution error. A failed check does not erase durable status. |
-| `running`       | `Deployment`                        | Identity embedded in the current page.                                   |
-| `target`        | `Deployment \| null`                | Last successfully resolved target.                                       |
-| `checkedAt`     | `Date \| null`                      | Time of the last successful check.                                       |
-| `reloadBlocked` | `boolean`                           | The reload guard stopped a repeated mixed-version loop.                  |
-| `check()`       | `Promise<void>`                     | Check now. It never rejects.                                             |
-| `reload()`      | `void`                              | Request a guarded page reload.                                           |
+| Field           | Type                                | Meaning                                                                                                            |
+| --------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `status`        | `"unknown" \| "current" \| "stale"` | Last successful policy result.                                                                                     |
+| `isChecking`    | `boolean`                           | A target check is active.                                                                                          |
+| `error`         | `Error \| null`                     | The last resolution error. A failed check does not erase durable status.                                           |
+| `running`       | `Deployment`                        | Identity embedded in the current page.                                                                             |
+| `target`        | `Deployment \| null`                | Last successfully resolved target.                                                                                 |
+| `checkedAt`     | `Date \| null`                      | Time of the last successful check.                                                                                 |
+| `reloadBlocked` | `boolean`                           | The reload guard stopped a repeated mixed-version loop. The guard is inactive when session storage is unavailable. |
+| `check()`       | `Promise<void>`                     | Check now. It never rejects.                                                                                       |
+| `reload()`      | `void`                              | Request a guarded page reload.                                                                                     |
 
 ## Headless API
 

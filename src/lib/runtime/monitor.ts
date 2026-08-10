@@ -118,6 +118,7 @@ class DeploymentMonitorImplementation
         checkedAt: new Date(this.#environment.now()),
         error: null,
         isChecking: false,
+        reloadBlocked: this.#state.reloadBlocked && this.#state.target?.id === target.id,
         status: this.#policy(source.running, target),
         target,
       })

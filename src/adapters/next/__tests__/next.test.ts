@@ -29,7 +29,7 @@ describe("Next adapter", () => {
     const wrapped = withCrispen(config, { deploymentId: "A" })
     const headers = await wrapped.headers?.()
 
-    expect(wrapped.deploymentId).toBe("A")
+    expect(wrapped.deploymentId).toBeUndefined()
     expect(wrapped.generateBuildId).toBe(generateUserBuildId)
     expect(wrapped.env?.USER_VALUE).toBe("preserved")
     expect(wrapped.reactStrictMode).toBe(true)
@@ -43,6 +43,50 @@ describe("Next adapter", () => {
         source: "/_crispen/deployment.json",
       },
     ])
+  })
+
+  it("does not override the Next deployment id used by Skew Protection", () => {
+    const previousDeploymentId = process.env.NEXT_DEPLOYMENT_ID
+    process.env.NEXT_DEPLOYMENT_ID = "vercel-deployment"
+
+    try {
+      const wrapped = withCrispen({}, { deploymentId: "crispen-deployment" })
+
+      expect(wrapped.deploymentId).toBeUndefined()
+    } finally {
+      if (previousDeploymentId === undefined) {
+        Reflect.deleteProperty(process.env, "NEXT_DEPLOYMENT_ID")
+      } else {
+        process.env.NEXT_DEPLOYMENT_ID = previousDeploymentId
+      }
+    }
+  })
+
+  it("prefixes the default endpoint with the Next base path", async () => {
+    const wrapped = withCrispen({ basePath: "/app" }, { deploymentId: "A" })
+
+    expect(JSON.parse(wrapped.env?.CRISPEN_NEXT_EMBED ?? "{}")).toMatchObject({
+      endpoint: "/app/_crispen/deployment.json",
+    })
+    expect(await wrapped.headers?.()).toContainEqual({
+      headers: [{ key: "Cache-Control", value: "no-store" }],
+      source: "/app/_crispen/deployment.json",
+    })
+  })
+
+  it("keeps an explicit endpoint unchanged under a Next base path", async () => {
+    const wrapped = withCrispen(
+      { basePath: "/app" },
+      { deploymentId: "A", endpoint: "/descriptor.json" }
+    )
+
+    expect(JSON.parse(wrapped.env?.CRISPEN_NEXT_EMBED ?? "{}")).toMatchObject({
+      endpoint: "/descriptor.json",
+    })
+    expect(await wrapped.headers?.()).toContainEqual({
+      headers: [{ key: "Cache-Control", value: "no-store" }],
+      source: "/descriptor.json",
+    })
   })
 
   it("renders the embed and serves the matching no-store descriptor", async () => {
@@ -143,7 +187,7 @@ describe("Next adapter", () => {
         ),
         Bun.write(
           join(root, "next.config.mjs"),
-          'import { withCrispen } from "crispen/next"\nexport default withCrispen({}, { deploymentId: "A" })\n'
+          'import { withCrispen } from "crispen/next"\nexport default withCrispen({ basePath: "/app" }, { deploymentId: "A" })\n'
         ),
         Bun.write(
           join(root, "app/layout.tsx"),
@@ -176,8 +220,8 @@ describe("Next adapter", () => {
       try {
         await waitForServer(port)
         const [htmlResponse, descriptorResponse] = await Promise.all([
-          fetch(`http://127.0.0.1:${port}/`),
-          fetch(`http://127.0.0.1:${port}/_crispen/deployment.json`),
+          fetch(`http://127.0.0.1:${port}/app/`),
+          fetch(`http://127.0.0.1:${port}/app/_crispen/deployment.json`),
         ])
         const [html, descriptor] = await Promise.all([
           htmlResponse.text(),
@@ -186,6 +230,7 @@ describe("Next adapter", () => {
 
         expect(html).toContain("globalThis.__CRISPEN__")
         expect(html).toContain('\\"id\\":\\"A\\"')
+        expect(html).toContain("/app/_crispen/deployment.json")
         expect(descriptorResponse.headers.get("Cache-Control")).toBe("no-store")
         expect(parseDescriptor(descriptor).id).toBe("A")
       } finally {
@@ -244,7 +289,7 @@ async function run(command: string[], cwd: string): Promise<void> {
 
 async function waitForServer(port: number, attempts = 100): Promise<void> {
   try {
-    const response = await fetch(`http://127.0.0.1:${port}/`)
+    const response = await fetch(`http://127.0.0.1:${port}/app/`)
     if (response.ok) {
       return
     }

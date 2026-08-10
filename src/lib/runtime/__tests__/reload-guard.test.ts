@@ -78,6 +78,23 @@ describe("deployment reload guard", () => {
     expect(monitor.getState().reloadBlocked).toBe(false)
   })
 
+  it("reloads without protection when session storage is unavailable", async () => {
+    const environment = new FakeEnvironment(null)
+    const monitor = createDeploymentMonitor(
+      {
+        resolveTarget: () => Promise.resolve({ id: "B" }),
+        running: { id: "A" },
+      },
+      { environment }
+    )
+    await monitor.check()
+
+    monitor.reload()
+
+    expect(environment.reloadCalls).toBe(1)
+    expect(monitor.getState().reloadBlocked).toBe(false)
+  })
+
   it("starts a new reload sequence after the cooldown", async () => {
     const storage = new MemoryStorage()
     const environment = new FakeEnvironment(storage)
@@ -95,6 +112,28 @@ describe("deployment reload guard", () => {
     monitor.reload()
 
     expect(environment.reloadCalls).toBe(1)
+    expect(monitor.getState().reloadBlocked).toBe(false)
+  })
+
+  it("clears a blocked reload when the target deployment changes", async () => {
+    const storage = new MemoryStorage()
+    const environment = new FakeEnvironment(storage)
+    let target = "B"
+    storage.setItem(RELOAD_MARKER_KEY, JSON.stringify({ at: 0, attempts: 2, from: "A", to: "B" }))
+    const monitor = createDeploymentMonitor(
+      {
+        resolveTarget: () => Promise.resolve({ id: target }),
+        running: { id: "A" },
+      },
+      { environment }
+    )
+    await monitor.check()
+    monitor.reload()
+    expect(monitor.getState().reloadBlocked).toBe(true)
+
+    target = "C"
+    await monitor.check()
+
     expect(monitor.getState().reloadBlocked).toBe(false)
   })
 })

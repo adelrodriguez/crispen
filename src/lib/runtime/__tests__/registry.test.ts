@@ -22,6 +22,18 @@ describe("deployment monitor registry", () => {
     expect(getMonitor(firstSource)).not.toBe(getMonitor(secondSource))
   })
 
+  it("starts a new weak registry when reset", () => {
+    const source: DeploymentSource = {
+      resolveTarget: () => Promise.resolve({ id: "first" }),
+      running: { id: "first" },
+    }
+    const monitor = getMonitor(source)
+
+    resetRegistry()
+
+    expect(getMonitor(source)).not.toBe(monitor)
+  })
+
   it("lazily creates one default monitor from the embed", () => {
     globalThis.__CRISPEN__ = {
       running: { id: "running" },

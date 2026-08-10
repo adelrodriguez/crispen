@@ -36,6 +36,10 @@ export class DeploymentScheduler {
   }
 
   update(schedule: DeploymentSchedule): void {
+    if (this.#schedule !== undefined && schedulesMatch(this.#schedule, schedule)) {
+      return
+    }
+
     this.stop()
     this.#schedule = schedule
     this.#environment.addEventListener("visibilitychange", this.#onVisibilityChange)
@@ -93,4 +97,13 @@ export class DeploymentScheduler {
 
     this.#interval = this.#environment.setInterval(this.#check, this.#schedule.checkInterval)
   }
+}
+
+function schedulesMatch(left: DeploymentSchedule, right: DeploymentSchedule): boolean {
+  return (
+    left.checkInterval === right.checkInterval &&
+    left.checkOnReconnect === right.checkOnReconnect &&
+    left.checkOnSubscribe === right.checkOnSubscribe &&
+    left.checkOnVisible === right.checkOnVisible
+  )
 }

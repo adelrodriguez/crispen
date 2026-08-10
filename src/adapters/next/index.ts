@@ -57,7 +57,7 @@ export function crispenPagesHandler(_request: NextApiRequest, response: NextApiR
 }
 
 export function withCrispen(config: NextConfig = {}, options: CrispenNextOptions = {}): NextConfig {
-  const endpoint = options.endpoint ?? DEFAULT_ENDPOINT
+  const endpoint = options.endpoint ?? prefixBasePath(config.basePath, DEFAULT_ENDPOINT)
   const deployment: Deployment = {
     builtAt: new Date(),
     id: resolveDeploymentId(options.deploymentId ?? config.deploymentId),
@@ -75,7 +75,6 @@ export function withCrispen(config: NextConfig = {}, options: CrispenNextOptions
 
   return {
     ...config,
-    deploymentId: deployment.id,
     env: {
       ...config.env,
       [DESCRIPTOR_ENVIRONMENT_KEY]: development ? "" : serializeDescriptor(deployment),
@@ -89,6 +88,14 @@ export function withCrispen(config: NextConfig = {}, options: CrispenNextOptions
             descriptorHeader,
           ],
   }
+}
+
+function prefixBasePath(basePath: string | undefined, endpoint: string): string {
+  if (basePath === undefined || basePath.length === 0) {
+    return endpoint
+  }
+
+  return `${basePath.replace(/\/+$/u, "")}${endpoint}`
 }
 
 function isNextDevelopmentCommand(): boolean {

@@ -44,17 +44,20 @@ async function createFixture(): Promise<string> {
 }
 
 async function buildFixture(
-  options: Parameters<typeof crispen>[0]
+  options: Parameters<typeof crispen>[0],
+  base?: string
 ): Promise<{ descriptor: string; html: string; root: string }> {
   const root = await createFixture()
   await build({
+    base,
     logLevel: "silent",
     plugins: [crispen(options)],
     root,
   })
+  const descriptorPath = options?.endpoint?.replace(/^\/+/, "") ?? "_crispen/deployment.json"
 
   return {
-    descriptor: await readFile(join(root, "dist/_crispen/deployment.json"), "utf8"),
+    descriptor: await readFile(join(root, "dist", descriptorPath), "utf8"),
     html: await readFile(join(root, "dist/index.html"), "utf8"),
     root,
   }
@@ -94,7 +97,7 @@ describe("Vite adapter", () => {
 
     delete process.env.GITHUB_SHA
     const random = await buildFixture({})
-    expect(parseDescriptor(random.descriptor).id).toMatch(/^[\da-f-]{36}$/u)
+    expect(parseDescriptor(random.descriptor).id).toMatch(/^[\da-f]{32}$/u)
   })
 
   it("escapes the embed for an HTML script context", async () => {
@@ -128,6 +131,22 @@ describe("Vite adapter", () => {
       descriptorExists = false
     }
     expect(descriptorExists).toBe(false)
+  })
+
+  it("prefixes the default endpoint with the Vite base", async () => {
+    const { descriptor, html } = await buildFixture({ deploymentId: "A" }, "/app/")
+
+    expect(html).toContain('"endpoint":"/app/_crispen/deployment.json"')
+    expect(parseDescriptor(descriptor).id).toBe("A")
+  })
+
+  it("keeps an explicit endpoint unchanged under a Vite base", async () => {
+    const { html } = await buildFixture(
+      { deploymentId: "A", endpoint: "/descriptor.json" },
+      "/app/"
+    )
+
+    expect(html).toContain('"endpoint":"/descriptor.json"')
   })
 
   it("does not inject an embed during Vite development", async () => {

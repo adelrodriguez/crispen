@@ -27,6 +27,7 @@ export class FakeEnvironment implements RuntimeEnvironment {
   #nextInterval = 1
   #now = 0
   #visible = true
+  intervalStarts = 0
   reloadCalls = 0
   readonly storage: RuntimeStorage | null
 
@@ -81,6 +82,7 @@ export class FakeEnvironment implements RuntimeEnvironment {
   }
 
   setInterval(callback: () => void, delay: number): unknown {
+    this.intervalStarts += 1
     const handle = this.#nextInterval
     this.#nextInterval += 1
     this.#intervals.set(handle, { callback, delay })
