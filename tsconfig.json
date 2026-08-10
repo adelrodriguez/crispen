@@ -13,6 +13,6 @@
     "verbatimModuleSyntax": true,
     "types": ["bun"]
   },
-  "include": ["src", "*.config.ts"],
+  "include": ["src", "scripts", "e2e", "*.config.ts"],
   "exclude": ["node_modules", "dist", ".packref"]
 }

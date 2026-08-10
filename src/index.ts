@@ -1,3 +1,2 @@
-export function main() {
-  return "Let's bake some pastry! 🥐"
-}
+export * from "./lib/protocol"
+export * from "./lib/runtime"

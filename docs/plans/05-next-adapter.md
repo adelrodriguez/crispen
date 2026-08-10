@@ -83,6 +83,44 @@ Spike in a scratch Next app (latest stable, App Router, Turbopack default):
 Output: a short decision record appended to this plan (mechanism chosen per
 responsibility, per router, with the spike evidence).
 
+### Decision record — 2026-08-10
+
+- **Running identity:** use an explicit `<CrispenScript />` in the App Router
+  root layout or Pages Router `_document`. It uses Next's
+  `beforeInteractive` script strategy. Next documents that this strategy
+  places the script in the initial HTML before Next modules. A Next 16.3.0
+  spike proved that `next.config` `env` replacement reaches package code in
+  both Turbopack and webpack builds. We do not make the core depend on a
+  bundler-specific define.
+- **Descriptor:** export `GET` from `crispen/next` through
+  `app/%5Fcrispen/deployment.json/route.ts`. The encoded folder is required
+  because Next treats a literal leading-underscore app folder as private. Add
+  `export const dynamic = "force-static"` for `output: "export"`. The spike
+  produced `out/_crispen/deployment.json` under both bundlers. A config-time
+  write to `public/` was also copied, but is rejected because it mutates the
+  user's source tree. Pages Router uses the exported API handler at
+  `pages/_crispen/deployment.json.ts`.
+- **Next identity:** set the stable `deploymentId` config field to the same
+  resolved id. Preserve the user's `generateBuildId`; it is a separate Next
+  build identity API.
+- **Headers:** append a `Cache-Control: no-store` entry through the merged
+  `headers()` config and also set it directly on the exported handlers.
+- **Vercel skew protection:** Vercel documents that framework-managed
+  requests are pinned but custom client `fetch()` calls are not. Therefore a
+  relative Crispen descriptor request remains independent by default. If an
+  app opts into the `__vdpl` cookie for long-lived sessions, the cookie pins
+  all requests, including the descriptor. Such apps must use an unpinned
+  control-plane endpoint or not apply that cookie to the Crispen path.
+- **Dev mode:** `next dev` leaves the embed absent, matching the Vite adapter's
+  inert behavior.
+
+Evidence: [Next Script](https://nextjs.org/docs/app/api-reference/components/script),
+[Route Handlers](https://nextjs.org/docs/app/api-reference/file-conventions/route),
+[static exports](https://nextjs.org/docs/app/guides/static-exports),
+[deploymentId](https://nextjs.org/docs/app/api-reference/config/next-config-js/deploymentId),
+[headers](https://nextjs.org/docs/app/api-reference/config/next-config-js/headers),
+and [Vercel Skew Protection](https://vercel.com/docs/skew-protection).
+
 ## Implementation (after decisions)
 
 1. `src/adapters/next/index.ts` — `withCrispen`, plus whichever of

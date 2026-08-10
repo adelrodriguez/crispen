@@ -1,0 +1,13 @@
+{
+  "name": "@crispen/lab-ui",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/app.tsx",
+    "./styles.css": "./src/styles.css"
+  },
+  "dependencies": {
+    "crispen": "workspace:*",
+    "react": "19.2.8"
+  }
+}
