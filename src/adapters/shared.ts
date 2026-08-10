@@ -2,30 +2,128 @@ import type { CrispenEmbed } from "../lib/protocol/embed"
 
 export { DEFAULT_DESCRIPTOR_ENDPOINT } from "../lib/protocol/http-source"
 
-const DEPLOYMENT_ID_ENVIRONMENT_VARIABLES = [
-  "GIT_SHA",
-  "VERCEL_GIT_COMMIT_SHA",
-  "CF_PAGES_COMMIT_SHA",
-  "GITHUB_SHA",
-] as const
+export type DeploymentPlatform = "cloudflare-pages" | "github-actions" | "netlify" | "vercel"
+
+export type DeploymentIdOption =
+  | string
+  | { readonly platform: DeploymentPlatform }
+  | { readonly env: string | readonly string[] }
+  | (() => string | undefined)
+
+interface PlatformStrategy {
+  readonly detect: (environment: NodeJS.ProcessEnv) => boolean
+  readonly resolve: (environment: NodeJS.ProcessEnv) => string | undefined
+}
+
+const PLATFORM_STRATEGIES: Record<DeploymentPlatform, PlatformStrategy> = {
+  "cloudflare-pages": {
+    detect: (environment) => environment.CF_PAGES === "1",
+    resolve: (environment) => readEnvironmentVariable(environment, "CF_PAGES_COMMIT_SHA"),
+  },
+  "github-actions": {
+    detect: (environment) => environment.GITHUB_ACTIONS === "true",
+    resolve: (environment) => readEnvironmentVariable(environment, "GITHUB_SHA"),
+  },
+  netlify: {
+    detect: (environment) => environment.NETLIFY === "true",
+    resolve: (environment) => readEnvironmentVariable(environment, "COMMIT_REF"),
+  },
+  vercel: {
+    detect: (environment) => environment.VERCEL === "1",
+    resolve: (environment) => readEnvironmentVariable(environment, "VERCEL_GIT_COMMIT_SHA"),
+  },
+}
+
+const PLATFORM_DETECTION_ORDER: readonly DeploymentPlatform[] = [
+  "vercel",
+  "cloudflare-pages",
+  "netlify",
+  "github-actions",
+]
 
 export function checkIsExternalEndpoint(endpoint: string): boolean {
   return /^(?:[a-z][a-z\d+.-]*:)?\/\//iu.test(endpoint)
 }
 
-export function resolveDeploymentId(explicit: string | undefined): string {
-  if (explicit !== undefined && explicit.length > 0) {
-    return explicit
+export function resolveDeploymentId(option?: DeploymentIdOption): string {
+  if (option === undefined || typeof option === "string") {
+    return option !== undefined && option.length > 0 ? option : detectDeploymentId()
   }
 
-  for (const variable of DEPLOYMENT_ID_ENVIRONMENT_VARIABLES) {
-    const value = process.env[variable]
-    if (value !== undefined && value.length > 0) {
+  const resolved = resolveStrategy(option)
+  if (resolved !== undefined) {
+    return resolved
+  }
+
+  // eslint-disable-next-line no-console -- A failed explicit strategy must be visible in the build log.
+  console.warn(
+    `Crispen could not resolve a deployment ID from ${describeStrategy(option)}. This build uses a random ID.`
+  )
+
+  return randomDeploymentId()
+}
+
+function describeStrategy(option: Exclude<DeploymentIdOption, string>): string {
+  if (typeof option === "function") {
+    return "the custom resolver"
+  }
+
+  if ("platform" in option) {
+    return `the ${option.platform} platform`
+  }
+
+  const variables = typeof option.env === "string" ? [option.env] : option.env
+
+  return variables.length === 1
+    ? `the ${variables[0]} environment variable`
+    : `the ${variables.join(", ")} environment variables`
+}
+
+function detectDeploymentId(): string {
+  for (const platform of PLATFORM_DETECTION_ORDER) {
+    const strategy = PLATFORM_STRATEGIES[platform]
+    if (strategy.detect(process.env)) {
+      return (
+        strategy.resolve(process.env) ??
+        readEnvironmentVariable(process.env, "GIT_SHA") ??
+        randomDeploymentId()
+      )
+    }
+  }
+
+  return readEnvironmentVariable(process.env, "GIT_SHA") ?? randomDeploymentId()
+}
+
+function randomDeploymentId(): string {
+  return crypto.randomUUID().replaceAll("-", "")
+}
+
+function readEnvironmentVariable(environment: NodeJS.ProcessEnv, name: string): string | undefined {
+  const value = environment[name]
+
+  return value !== undefined && value.length > 0 ? value : undefined
+}
+
+function resolveStrategy(option: Exclude<DeploymentIdOption, string>): string | undefined {
+  if (typeof option === "function") {
+    const value = option()
+
+    return value !== undefined && value.length > 0 ? value : undefined
+  }
+
+  if ("platform" in option) {
+    return PLATFORM_STRATEGIES[option.platform].resolve(process.env)
+  }
+
+  const variables = typeof option.env === "string" ? [option.env] : option.env
+  for (const variable of variables) {
+    const value = readEnvironmentVariable(process.env, variable)
+    if (value !== undefined) {
       return value
     }
   }
 
-  return crypto.randomUUID().replaceAll("-", "")
+  return undefined
 }
 
 export function resolvePublicEndpoint(base: string, endpoint: string): string {

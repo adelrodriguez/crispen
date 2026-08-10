@@ -5,6 +5,7 @@ import Script from "next/script.js"
 import { createElement } from "react"
 import type { CrispenEmbed } from "../../lib/protocol/embed"
 import type { Deployment } from "../../lib/protocol/types"
+import type { DeploymentIdOption } from "../shared"
 import { serializeDescriptor } from "../../lib/protocol/descriptor"
 import {
   DEFAULT_DESCRIPTOR_ENDPOINT,
@@ -14,8 +15,10 @@ import {
   serializeEmbed,
 } from "../shared"
 
+export type { DeploymentIdOption, DeploymentPlatform } from "../shared"
+
 export interface CrispenNextOptions {
-  readonly deploymentId?: string
+  readonly deploymentId?: DeploymentIdOption
   readonly endpoint?: string
 }
 
