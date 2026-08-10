@@ -13,13 +13,12 @@ Vite and Next.js adapters.
 
 | Plan                                                                    | Delivers                                          | Depends on             |
 | ----------------------------------------------------------------------- | ------------------------------------------------- | ---------------------- |
-| [07-package-contract](./07-package-contract.md)                         | Published exports and declaration checks          | Current implementation |
 | [08-runtime-resilience](./08-runtime-resilience.md)                     | Subscriber predicate policy and check timeout     | Current runtime        |
 | [09-adapter-edge-coverage](./09-adapter-edge-coverage.md)               | Endpoint tables and Pages Router production check | Current adapters       |
 | [10-react-lifecycle-coverage](./10-react-lifecycle-coverage.md)         | Option-change and hook reload coverage            | 08                     |
 | [11-conditional-descriptor-fetch](./11-conditional-descriptor-fetch.md) | Conditional descriptor requests with ETags        | Current protocol layer |
 
-Plans 07–09 and 11 can run in parallel. In plan 08, settle subscriber predicate
+Plans 08, 09, and 11 can run in parallel. In plan 08, settle subscriber predicate
 policy before adding the check timeout. Plan 10 starts after plan 08 because its
 option-change test depends on the shared predicate contract.
 

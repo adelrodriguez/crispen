@@ -8,6 +8,7 @@ export default defineConfig({
     "examples/*/.next/**",
     "examples/*/out/**",
     "examples/*/builds/**",
+    "tests/package-contract/**",
   ],
   options: {
     respectEslintDisableDirectives: true,

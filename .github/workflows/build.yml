@@ -51,8 +51,5 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build
-        run: bun run build
-
-      - name: Verify entrypoint exports
-        run: bun scripts/verify-exports.ts
+      - name: Verify package contract
+        run: bun run test:exports
