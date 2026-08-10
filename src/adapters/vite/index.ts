@@ -1,7 +1,7 @@
 import type { Plugin } from "vite"
 import type { CrispenEmbed, Deployment } from "../../lib/protocol"
 import { serializeDescriptor } from "../../lib/protocol"
-import { isExternalEndpoint, resolvePublicEndpoint } from "../../lib/protocol/endpoint"
+import { isExternalEndpoint, resolvePublicEndpoint } from "../endpoint"
 
 export interface CrispenViteOptions {
   readonly deploymentId?: string

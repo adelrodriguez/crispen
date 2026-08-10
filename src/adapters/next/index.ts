@@ -4,7 +4,7 @@ import Script from "next/script.js"
 import { createElement } from "react"
 import type { CrispenEmbed, Deployment } from "../../lib/protocol"
 import { serializeDescriptor } from "../../lib/protocol"
-import { isExternalEndpoint, resolvePublicEndpoint } from "../../lib/protocol/endpoint"
+import { isExternalEndpoint, resolvePublicEndpoint } from "../endpoint"
 
 export interface CrispenNextOptions {
   readonly deploymentId?: string
@@ -73,10 +73,7 @@ export function withCrispen(config: NextConfig = {}, options: CrispenNextOptions
     },
     v: 1,
   }
-  const descriptorHeader = createDescriptorHeader(
-    endpoint,
-    basePath.length > 0 && !isExternalEndpoint(configuredEndpoint)
-  )
+  const descriptorHeader = createDescriptorHeader(endpoint, basePath.length > 0)
   const development = isNextDevelopmentCommand()
 
   return {

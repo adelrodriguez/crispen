@@ -27,7 +27,6 @@ const declarationCheck = Bun.spawn(
     "node_modules/.bin/tsc",
     "--ignoreConfig",
     "--noEmit",
-    "--skipLibCheck",
     "--strict",
     "--target",
     "ESNext",
