@@ -23,9 +23,7 @@ export function crispen(options: CrispenViteOptions = {}): Plugin {
   return {
     apply: "build",
     configResolved(config) {
-      if (options.endpoint === undefined) {
-        endpoint = prefixBase(config.base, DEFAULT_ENDPOINT)
-      }
+      endpoint = resolvePublicEndpoint(config.base, descriptorEndpoint)
       deployment = {
         builtAt: new Date(),
         id: resolveDeploymentId(options.deploymentId),
@@ -96,12 +94,17 @@ function resolveDeploymentId(explicit: string | undefined): string {
   return crypto.randomUUID().replaceAll("-", "")
 }
 
-function prefixBase(base: string, endpoint: string): string {
-  if (base.length === 0 || base === "/") {
+function resolvePublicEndpoint(base: string, endpoint: string): string {
+  if (/^(?:[a-z][a-z\d+.-]*:)?\/\//iu.test(endpoint)) {
     return endpoint
   }
 
-  return `${base.replace(/\/+$/u, "")}${endpoint}`
+  const rootedEndpoint = `/${endpoint.replace(/^\/+/, "")}`
+  if (!base.startsWith("/") || base === "/") {
+    return rootedEndpoint
+  }
+
+  return `${base.replace(/\/+$/u, "")}${rootedEndpoint}`
 }
 
 function serializeEmbed(embed: CrispenEmbed): string {

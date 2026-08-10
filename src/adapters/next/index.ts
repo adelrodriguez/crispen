@@ -70,7 +70,7 @@ export function withCrispen(config: NextConfig = {}, options: CrispenNextOptions
     },
     v: 1,
   }
-  const descriptorHeader = createDescriptorHeader(endpoint)
+  const descriptorHeader = createDescriptorHeader(endpoint, config.basePath !== undefined)
   const development = isNextDevelopmentCommand()
 
   return {
@@ -103,13 +103,15 @@ function isNextDevelopmentCommand(): boolean {
 }
 
 function createDescriptorHeader(
-  endpoint: string
+  endpoint: string,
+  hasBasePath: boolean
 ): Awaited<ReturnType<NonNullable<NextConfig["headers"]>>>[number] | undefined {
   if (/^(?:[a-z][a-z\d+.-]*:)?\/\//iu.test(endpoint)) {
     return undefined
   }
 
   return {
+    ...(hasBasePath ? { basePath: false as const } : {}),
     headers: [{ key: "Cache-Control", value: "no-store" }],
     source: endpoint,
   }

@@ -69,6 +69,7 @@ describe("Next adapter", () => {
       endpoint: "/app/_crispen/deployment.json",
     })
     expect(await wrapped.headers?.()).toContainEqual({
+      basePath: false,
       headers: [{ key: "Cache-Control", value: "no-store" }],
       source: "/app/_crispen/deployment.json",
     })
@@ -84,6 +85,7 @@ describe("Next adapter", () => {
       endpoint: "/descriptor.json",
     })
     expect(await wrapped.headers?.()).toContainEqual({
+      basePath: false,
       headers: [{ key: "Cache-Control", value: "no-store" }],
       source: "/descriptor.json",
     })

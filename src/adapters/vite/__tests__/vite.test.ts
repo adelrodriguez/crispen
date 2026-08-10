@@ -140,13 +140,31 @@ describe("Vite adapter", () => {
     expect(parseDescriptor(descriptor).id).toBe("A")
   })
 
-  it("keeps an explicit endpoint unchanged under a Vite base", async () => {
-    const { html } = await buildFixture(
+  it("resolves an explicit local endpoint under the Vite base", async () => {
+    const { descriptor, html } = await buildFixture(
       { deploymentId: "A", endpoint: "/descriptor.json" },
       "/app/"
     )
 
-    expect(html).toContain('"endpoint":"/descriptor.json"')
+    expect(html).toContain('"endpoint":"/app/descriptor.json"')
+    expect(parseDescriptor(descriptor).id).toBe("A")
+  })
+
+  it("keeps the default endpoint root-absolute for a relative Vite base", async () => {
+    const { descriptor, html } = await buildFixture({ deploymentId: "A" }, "./")
+
+    expect(html).toContain('"endpoint":"/_crispen/deployment.json"')
+    expect(parseDescriptor(descriptor).id).toBe("A")
+  })
+
+  it("keeps the default endpoint on the application origin for a URL Vite base", async () => {
+    const { descriptor, html } = await buildFixture(
+      { deploymentId: "A" },
+      "https://cdn.example/app/"
+    )
+
+    expect(html).toContain('"endpoint":"/_crispen/deployment.json"')
+    expect(parseDescriptor(descriptor).id).toBe("A")
   })
 
   it("does not inject an embed during Vite development", async () => {

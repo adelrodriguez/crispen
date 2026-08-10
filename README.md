@@ -66,7 +66,9 @@ The Vite adapter does these operations during a production build:
 
 The adapter is inert during `vite dev`.
 When you set Vite `base`, the adapter adds it to the default descriptor endpoint.
-An explicit `endpoint` stays unchanged.
+A local explicit `endpoint` is relative to that base. An external endpoint stays
+unchanged. For a relative or full-URL base, the local endpoint stays
+root-absolute on the application origin.
 
 ```ts
 crispen({
