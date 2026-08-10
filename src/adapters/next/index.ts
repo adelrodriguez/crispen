@@ -4,6 +4,7 @@ import Script from "next/script.js"
 import { createElement } from "react"
 import type { CrispenEmbed, Deployment } from "../../lib/protocol"
 import { serializeDescriptor } from "../../lib/protocol"
+import { isExternalEndpoint, resolvePublicEndpoint } from "../../lib/protocol/endpoint"
 
 export interface CrispenNextOptions {
   readonly deploymentId?: string
@@ -57,7 +58,9 @@ export function crispenPagesHandler(_request: NextApiRequest, response: NextApiR
 }
 
 export function withCrispen(config: NextConfig = {}, options: CrispenNextOptions = {}): NextConfig {
-  const endpoint = options.endpoint ?? prefixBasePath(config.basePath, DEFAULT_ENDPOINT)
+  const configuredEndpoint = options.endpoint ?? DEFAULT_ENDPOINT
+  const basePath = config.basePath ?? ""
+  const endpoint = resolvePublicEndpoint(basePath, configuredEndpoint)
   const deployment: Deployment = {
     builtAt: new Date(),
     id: resolveDeploymentId(options.deploymentId ?? config.deploymentId),
@@ -70,7 +73,10 @@ export function withCrispen(config: NextConfig = {}, options: CrispenNextOptions
     },
     v: 1,
   }
-  const descriptorHeader = createDescriptorHeader(endpoint, config.basePath !== undefined)
+  const descriptorHeader = createDescriptorHeader(
+    endpoint,
+    basePath.length > 0 && !isExternalEndpoint(configuredEndpoint)
+  )
   const development = isNextDevelopmentCommand()
 
   return {
@@ -90,14 +96,6 @@ export function withCrispen(config: NextConfig = {}, options: CrispenNextOptions
   }
 }
 
-function prefixBasePath(basePath: string | undefined, endpoint: string): string {
-  if (basePath === undefined || basePath.length === 0) {
-    return endpoint
-  }
-
-  return `${basePath.replace(/\/+$/u, "")}${endpoint}`
-}
-
 function isNextDevelopmentCommand(): boolean {
   return process.argv.some((argument) => argument === "dev" || argument === "next-dev")
 }
@@ -106,7 +104,7 @@ function createDescriptorHeader(
   endpoint: string,
   hasBasePath: boolean
 ): Awaited<ReturnType<NonNullable<NextConfig["headers"]>>>[number] | undefined {
-  if (/^(?:[a-z][a-z\d+.-]*:)?\/\//iu.test(endpoint)) {
+  if (isExternalEndpoint(endpoint)) {
     return undefined
   }
 

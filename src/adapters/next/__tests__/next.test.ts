@@ -75,20 +75,43 @@ describe("Next adapter", () => {
     })
   })
 
-  it("keeps an explicit endpoint unchanged under a Next base path", async () => {
+  it("resolves an explicit local endpoint under the Next base path", async () => {
     const wrapped = withCrispen(
       { basePath: "/app" },
       { deploymentId: "A", endpoint: "/descriptor.json" }
     )
 
     expect(JSON.parse(wrapped.env?.CRISPEN_NEXT_EMBED ?? "{}")).toMatchObject({
-      endpoint: "/descriptor.json",
+      endpoint: "/app/descriptor.json",
     })
     expect(await wrapped.headers?.()).toContainEqual({
       basePath: false,
       headers: [{ key: "Cache-Control", value: "no-store" }],
-      source: "/descriptor.json",
+      source: "/app/descriptor.json",
     })
+  })
+
+  it("does not add a base-path override for an empty base path", async () => {
+    const wrapped = withCrispen({ basePath: "" }, { deploymentId: "A" })
+
+    expect(await wrapped.headers?.()).toEqual([
+      {
+        headers: [{ key: "Cache-Control", value: "no-store" }],
+        source: "/_crispen/deployment.json",
+      },
+    ])
+  })
+
+  it("keeps an external endpoint unchanged under a Next base path", async () => {
+    const wrapped = withCrispen(
+      { basePath: "/app" },
+      { deploymentId: "A", endpoint: "https://control.example/descriptor.json" }
+    )
+
+    expect(JSON.parse(wrapped.env?.CRISPEN_NEXT_EMBED ?? "{}")).toMatchObject({
+      endpoint: "https://control.example/descriptor.json",
+    })
+    expect(await wrapped.headers?.()).toBeUndefined()
   })
 
   it("renders the embed and serves the matching no-store descriptor", async () => {

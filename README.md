@@ -132,8 +132,8 @@ export { crispenPagesHandler as default } from "crispen/next"
 `env`, and `headers()`. It does not set Next.js `deploymentId`, because that
 value can conflict with host skew protection. It adds the Crispen environment
 values and a `no-store` header rule for a local endpoint. When you set Next.js
-`basePath`, the adapter adds it to the default descriptor endpoint. An explicit
-`endpoint` stays unchanged. `next dev` is inert.
+`basePath`, the adapter adds it to local default and explicit descriptor
+endpoints. An external endpoint stays unchanged. `next dev` is inert.
 
 Next.js does not apply `headers()` rules to `output: "export"`. For a static
 export, add the descriptor cache rule in your hosting platform. See

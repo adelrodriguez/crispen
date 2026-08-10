@@ -1,6 +1,7 @@
 import type { Plugin } from "vite"
 import type { CrispenEmbed, Deployment } from "../../lib/protocol"
 import { serializeDescriptor } from "../../lib/protocol"
+import { isExternalEndpoint, resolvePublicEndpoint } from "../../lib/protocol/endpoint"
 
 export interface CrispenViteOptions {
   readonly deploymentId?: string
@@ -64,7 +65,7 @@ export function crispen(options: CrispenViteOptions = {}): Plugin {
 }
 
 function descriptorFileName(endpoint: string): string | undefined {
-  if (/^(?:[a-z][a-z\d+.-]*:)?\/\//iu.test(endpoint)) {
+  if (isExternalEndpoint(endpoint)) {
     return undefined
   }
 
@@ -92,19 +93,6 @@ function resolveDeploymentId(explicit: string | undefined): string {
   }
 
   return crypto.randomUUID().replaceAll("-", "")
-}
-
-function resolvePublicEndpoint(base: string, endpoint: string): string {
-  if (/^(?:[a-z][a-z\d+.-]*:)?\/\//iu.test(endpoint)) {
-    return endpoint
-  }
-
-  const rootedEndpoint = `/${endpoint.replace(/^\/+/, "")}`
-  if (!base.startsWith("/") || base === "/") {
-    return rootedEndpoint
-  }
-
-  return `${base.replace(/\/+$/u, "")}${rootedEndpoint}`
 }
 
 function serializeEmbed(embed: CrispenEmbed): string {

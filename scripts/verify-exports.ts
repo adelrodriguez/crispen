@@ -22,4 +22,25 @@ function assertExport(module: unknown, name: string): void {
   }
 }
 
-console.info("Verified all four built package entries.")
+const declarationCheck = Bun.spawn(
+  [
+    "node_modules/.bin/tsc",
+    "--ignoreConfig",
+    "--noEmit",
+    "--skipLibCheck",
+    "--strict",
+    "--target",
+    "ESNext",
+    "--module",
+    "Preserve",
+    "--moduleResolution",
+    "bundler",
+    "tests/fixtures/package-exports.ts",
+  ],
+  { stderr: "inherit", stdout: "inherit" }
+)
+if ((await declarationCheck.exited) !== 0) {
+  throw new Error("Built package declarations failed the consumer type check.")
+}
+
+console.info("Verified all four built package entries and declarations.")

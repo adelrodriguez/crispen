@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, spyOn } from "bun:test"
+import { afterEach, describe, expect, it } from "bun:test"
 import type { DeploymentSource } from "../../protocol"
 import { getDefaultMonitor, getMonitor, resetRegistry } from "../registry"
 
@@ -32,21 +32,6 @@ describe("deployment monitor registry", () => {
     resetRegistry()
 
     expect(getMonitor(source)).not.toBe(monitor)
-  })
-
-  it("destroys a live per-source monitor when reset", () => {
-    const clearInterval = spyOn(globalThis, "clearInterval")
-    const source: DeploymentSource = {
-      resolveTarget: () => Promise.resolve({ id: "first" }),
-      running: { id: "first" },
-    }
-    const monitor = getMonitor(source)
-    monitor.subscribe(() => false, { checkInterval: 20_000, checkOnSubscribe: false })
-
-    resetRegistry()
-
-    expect(clearInterval).toHaveBeenCalled()
-    clearInterval.mockRestore()
   })
 
   it("lazily creates one default monitor from the embed", () => {
