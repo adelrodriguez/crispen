@@ -2,8 +2,8 @@
 
 import type { DeploymentMonitor } from "crispen"
 import { getDefaultMonitor } from "crispen"
-import { deploymentStatusOptions, useDeploymentStatus } from "crispen/react"
-import { useEffect, useMemo, useState } from "react"
+import { useDeploymentStatus } from "crispen/react"
+import { useEffect, useState } from "react"
 
 declare global {
   interface Window {
@@ -15,16 +15,11 @@ const DEFAULT_INTERVAL = 10_000
 
 export function CrispenLab({ adapter }: { readonly adapter: "Next.js" | "Vite" }) {
   const interval = readInterval()
-  const options = useMemo(
-    () =>
-      deploymentStatusOptions({
-        checkInterval: interval,
-        checkOnReconnect: true,
-        checkOnVisible: true,
-      }),
-    [interval]
-  )
-  const deployment = useDeploymentStatus(options)
+  const deployment = useDeploymentStatus({
+    checkInterval: interval,
+    checkOnReconnect: true,
+    checkOnVisible: true,
+  })
   const [events, setEvents] = useState<string[]>([])
 
   useEffect(() => {

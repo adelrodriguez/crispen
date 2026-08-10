@@ -5,7 +5,7 @@ import { StrictMode } from "react"
 import { renderToString } from "react-dom/server"
 import type { DeploymentSource, DeploymentStatus, DeploymentStatusOptions } from "../index"
 import { getMonitor, resetRegistry } from "../../../lib/runtime/registry"
-import { deploymentStatusOptions, useDeploymentStatus } from "../index"
+import { useDeploymentStatus } from "../index"
 
 beforeAll(() => {
   GlobalRegistrator.register()
@@ -49,14 +49,6 @@ function missingResolver(): never {
 }
 
 describe("React deployment integration", () => {
-  it("returns the same options object with its literal types", () => {
-    const input = { checkInterval: 20_000 as const }
-    const options = deploymentStatusOptions(input)
-
-    expect(options).toBe(input)
-    expectTypeOf(options.checkInterval).toEqualTypeOf<20_000>()
-  })
-
   it("renders unknown without an embed in the browser and during SSR", () => {
     const warning = spyOn(console, "warn").mockImplementation(() => false)
 
@@ -142,14 +134,14 @@ describe("React deployment integration", () => {
 
   it("uses the policy supplied to the hook", async () => {
     const states = new Map<string, DeploymentStatus>()
-    const options = deploymentStatusOptions({
+    const options = {
       checkInterval: 20_000,
       policy: () => "stale" as const,
       source: {
         resolveTarget: () => Promise.resolve({ id: "running" }),
         running: { id: "running" },
       },
-    })
+    } satisfies DeploymentStatusOptions
 
     const view = render(<SourceStatus id="policy" options={options} states={states} />)
 

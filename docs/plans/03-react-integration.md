@@ -1,18 +1,16 @@
 # Plan 03 — React integration (`crispen/react`)
 
-Delivers `useDeploymentStatus` and `deploymentStatusOptions`. Thin by
-design: the runtime (plan 02) already owns sharing, scheduling, and state;
-the hook is a subscription. If this plan grows logic, that logic probably
-belongs in plan 02.
+Delivers `useDeploymentStatus`. Thin by design: the runtime (plan 02) already
+owns sharing, scheduling, and state; the hook is a subscription. If this plan
+grows logic, that logic probably belongs in plan 02.
 
 Reference: `react-query/src/queryOptions.ts` (typed options helper) and
 `useBaseQuery.ts` (subscription shape) in the vendored source.
 
 ## Deliverables
 
-1. `src/integrations/react/index.ts` — `useDeploymentStatus`,
-   `deploymentStatusOptions`,
-   re-exported types
+1. `src/integrations/react/index.ts` — `useDeploymentStatus` and re-exported
+   types
 2. Tests
 3. Peer dependency wiring (`react >= 18`, optional)
 
@@ -40,10 +38,8 @@ Implementation:
     double-invokes effects — the runtime's refcounting must tolerate
     subscribe/unsubscribe/subscribe churn without restarting in-flight
     checks (add a runtime test for this in plan 02 if missing).
-- Options identity: changing options re-subscribes. Document that options
-  should be hoisted or memoized (`deploymentStatusOptions` at module scope
-  is the happy path); internally, compare by shallow equality to avoid
-  churn from inline object literals.
+- Options identity: changing options re-subscribes. Internally, compare by
+  shallow equality to avoid churn from inline object literals.
 - `check` and `reload` on the returned state are monitor-bound and
   reference-stable across renders.
 
@@ -51,22 +47,7 @@ No provider, no context, no `CrispenProvider` export — ever (decision 3 in
 plan 00). Multiple components calling the hook share one monitor and one
 schedule via the registry.
 
-## 2. `deploymentStatusOptions(options)`
-
-Identity function whose value is the type inference, mirroring TanStack's
-`queryOptions`:
-
-```ts
-const options = deploymentStatusOptions({
-  checkInterval: 60_000,
-})
-```
-
-Returns the input unchanged, typed, so apps can define shared configs in one
-module and pass them to many call sites with one object identity (which also
-makes the shallow-equality path in §1 exact).
-
-## 3. Package wiring
+## 2. Package wiring
 
 - `exports["./react"]` already scaffolded in plan 01; replace placeholder
 - peer: `react >= 18` (needs `useSyncExternalStore`), optional via

@@ -13,12 +13,6 @@ export interface DeploymentStatusOptions extends DeploymentSubscriberOptions {
   readonly source?: DeploymentSource
 }
 
-export function deploymentStatusOptions<const TOptions extends DeploymentStatusOptions>(
-  options: TOptions
-): TOptions {
-  return options
-}
-
 export function useDeploymentStatus(options: DeploymentStatusOptions = {}): DeploymentStatus {
   const stableOptions = useShallowStableOptions(options)
   const monitor = stableOptions.source ? getMonitor(stableOptions.source) : getDefaultMonitor()

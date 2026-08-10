@@ -151,9 +151,7 @@ with the same source share one monitor and one request. The hook uses an inert
 `unknown` state during server rendering.
 
 ```ts
-import { deploymentStatusOptions } from "crispen/react"
-
-export const deploymentChecks = deploymentStatusOptions({
+const deployment = useDeploymentStatus({
   checkInterval: 5 * 60_000,
   checkOnReconnect: true,
   checkOnSubscribe: true,
@@ -161,9 +159,8 @@ export const deploymentChecks = deploymentStatusOptions({
 })
 ```
 
-`deploymentStatusOptions(options)` returns the same object with its inferred
-type. Define shared options at module scope when practical. Inline option
-objects are also shallow-stabilized.
+Inline option objects are shallow-stabilized, so they do not cause needless
+subscriptions.
 
 The options are:
 

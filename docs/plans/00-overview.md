@@ -22,7 +22,7 @@ planned in detail yet.
 | ------------------------------------------------- | ---------------------------------------------------------------- | ---------------- |
 | [01-protocol](./01-protocol.md)                   | Types, wire format, embed, HTTP source, repo restructuring       | —                |
 | [02-runtime](./02-runtime.md)                     | `DeploymentMonitor`, registry, scheduler, policies, reload guard | 01               |
-| [03-react-integration](./03-react-integration.md) | `useDeploymentStatus`, `deploymentStatusOptions`                 | 02               |
+| [03-react-integration](./03-react-integration.md) | `useDeploymentStatus`                                            | 02               |
 | [04-vite-adapter](./04-vite-adapter.md)           | `crispen/vite` plugin                                            | 01 (02 for e2e)  |
 | [05-next-adapter](./05-next-adapter.md)           | `crispen/next`                                                   | 01, 04 learnings |
 | [06-testing](./06-testing.md)                     | Test layers, `examples/` skew labs, deploy simulation, e2e       | cross-cutting    |
