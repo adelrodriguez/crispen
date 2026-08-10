@@ -36,7 +36,7 @@ A local-storage mode would need a stable tab identifier in the key. That identif
 
 ### Access errors
 
-A browser can throw when code reads `window.sessionStorage`. A storage operation can also throw because of access policy, privacy mode, or quota. Crispen must catch both classes of error. It must use `null` storage after an access error and keep the current safe degradation: `reloadBlocked` stays false and `reload()` continues without guard protection.
+A browser can throw when code reads `window.sessionStorage`. A storage operation can also throw because of access policy, privacy mode, or quota. Crispen must catch both classes of error. It must report `reloadStatus: "unprotected"` after an access error, and `reload()` must continue without guard protection.
 
 ## Proposal
 

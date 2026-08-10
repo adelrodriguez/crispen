@@ -18,12 +18,14 @@ export type {
   RuntimeEventType,
   RuntimeStorage,
 } from "./lib/runtime/environment"
-export { createDeploymentMonitor } from "./lib/runtime/monitor"
+export { DEFAULT_CHECK_TIMEOUT, createDeploymentMonitor } from "./lib/runtime/monitor"
 export type {
+  CheckStatus,
   DeploymentMonitor,
   DeploymentMonitorOptions,
   DeploymentStatus,
   DeploymentSubscriberOptions,
+  ReloadStatus,
 } from "./lib/runtime/monitor"
 
 export { getDefaultMonitor, getMonitor } from "./lib/runtime/registry"
