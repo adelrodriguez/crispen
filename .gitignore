@@ -34,3 +34,12 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .DS_Store
 .packref/packages/
 .packref/.packref-lock-*.tmp
+
+# example and browser-test output
+examples/*/.next/
+examples/*/out/
+examples/*/dist/
+examples/*/builds/
+examples/*/serve
+test-results/
+playwright-report/

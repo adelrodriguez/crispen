@@ -1,41 +1,27 @@
 # Plan 00 — Overview and roadmap
 
-This directory holds the implementation plans for Crispen. Read `CONTEXT.md`
-at the repo root first; the plans use its ubiquitous language strictly
-(adapter = build/framework side, integration = UI library side).
+This directory holds the remaining implementation plans for Crispen. Read
+`CONTEXT.md` at the repo root first; the plans use its ubiquitous language
+strictly (adapter = build/framework side, integration = UI library side).
 
 ## Goal
 
-Ship a v1 of the `crispen` package with:
-
-- the protocol (types, descriptor wire format, embed convention)
-- the headless runtime (`DeploymentMonitor`)
-- one integration: React (`crispen/react`)
-- one adapter: Vite (`crispen/vite`)
-
-followed by a Next.js adapter. Svelte and Astro come later and are not
-planned in detail yet.
+Finish the v1 hardening work for the implemented core, React integration, and
+Vite and Next.js adapters.
 
 ## Plan index and order
 
-| Plan                                              | Delivers                                                         | Depends on       |
-| ------------------------------------------------- | ---------------------------------------------------------------- | ---------------- |
-| [01-protocol](./01-protocol.md)                   | Types, wire format, embed, HTTP source, repo restructuring       | —                |
-| [02-runtime](./02-runtime.md)                     | `DeploymentMonitor`, registry, scheduler, policies, reload guard | 01               |
-| [03-react-integration](./03-react-integration.md) | `useDeploymentStatus`, `deploymentStatusOptions`                 | 02               |
-| [04-vite-adapter](./04-vite-adapter.md)           | `crispen/vite` plugin                                            | 01 (02 for e2e)  |
-| [05-next-adapter](./05-next-adapter.md)           | `crispen/next`                                                   | 01, 04 learnings |
-| [06-testing](./06-testing.md)                     | Test layers, `examples/` skew labs, deploy simulation, e2e       | cross-cutting    |
+| Plan                                                                    | Delivers                                          | Depends on             |
+| ----------------------------------------------------------------------- | ------------------------------------------------- | ---------------------- |
+| [07-package-contract](./07-package-contract.md)                         | Published exports and declaration checks          | Current implementation |
+| [08-runtime-resilience](./08-runtime-resilience.md)                     | Subscriber predicate policy and check timeout     | Current runtime        |
+| [09-adapter-edge-coverage](./09-adapter-edge-coverage.md)               | Endpoint tables and Pages Router production check | Current adapters       |
+| [10-react-lifecycle-coverage](./10-react-lifecycle-coverage.md)         | Option-change and hook reload coverage            | 08                     |
+| [11-conditional-descriptor-fetch](./11-conditional-descriptor-fetch.md) | Conditional descriptor requests with ETags        | Current protocol layer |
 
-01 → 02 → 03 is strictly sequential. 04 can start in parallel once 01 lands.
-05 starts after 04 because it reuses the descriptor-emission logic and its
-investigation items depend on what 04 settles. 06 is cross-cutting and
-delivered incrementally alongside the others — read it before implementing
-02, because it imposes the injectable-environment seam on the runtime.
-
-The end-to-end milestone after 04: a Vite + React example app where deploying
-a new build flips a visible banner to stale within one check interval, and
-`reload()` recovers — with no endpoint configuration in app code.
+Plans 07–09 and 11 can run in parallel. In plan 08, settle subscriber predicate
+policy before adding the check timeout. Plan 10 starts after plan 08 because its
+option-change test depends on the shared predicate contract.
 
 ## Decisions already made
 
@@ -59,9 +45,9 @@ re-litigate them inside a plan.
 5. **Reload is client-initiated; the runtime guards it.** Crispen never
    reloads on its own. `reload()` records intent in sessionStorage and blocks
    itself after repeated reloads that land back on the same running id.
-6. **Policy is a pure function** `(running, target) => "current" | "stale"`.
-   Built-in `exactMatch()`. `supportedUntil` is cut from v1 — no dead wire
-   fields.
+6. **Current deployment is customizable.** The optional pure `isCurrent`
+   predicate has the shape `(running, target) => boolean`. Exact deployment ID
+   equality is the default. `supportedUntil` is cut from v1 — no dead wire fields.
 7. **Triggers**: `visibilitychange` (not `focus`), `pageshow` with
    `persisted`, `online`, and an interval that pauses while the tab is
    hidden.
@@ -72,23 +58,23 @@ re-litigate them inside a plan.
 
 ## Package layout (target state)
 
-Single package, subpath exports, built with bunup. Examples are bun
-workspaces, private, and consume the built `dist` (plan 06):
+Single package, subpath exports, built with bunup. Examples are bun workspaces,
+private, and consume the built `dist`:
 
 ```text
 src/
   index.ts            # core entry: re-exports lib
   lib/                # core: protocol + runtime (headless)
     protocol/         # types, descriptor, embed, http source
-    runtime/          # monitor, registry, scheduler, policies, reload guard
+    runtime/          # monitor, registry, scheduler, reload guard
   integrations/
     react/index.ts
   adapters/
     vite/index.ts
     next/index.ts
 examples/
-  vite-react/     # skew lab + e2e fixture (plans 04, 06)
-  nextjs/         # skew lab + e2e fixture (plans 05, 06)
+  vite-react/     # Vite + React skew lab and e2e fixture
+  nextjs/         # Next.js skew lab and e2e fixture
 scripts/
   simulate-deploy.ts
 ```
@@ -112,7 +98,7 @@ does not warn about React.
 
 TanStack Query source is vendored via packref at
 `.packref/packages/npm/@tanstack/{query-core,react-query}/5.101.4/src/`.
-Study before implementing plan 02/03:
+Reference implementations for the current runtime and React integration:
 
 - `query-core/src/subscribable.ts` — subscriber base class
 - `query-core/src/focusManager.ts` — visibilitychange handling, done right
@@ -120,7 +106,7 @@ Study before implementing plan 02/03:
 - `query-core/src/queryObserver.ts` — how hooks subscribe to shared core state
 - `react-query/src/queryOptions.ts` — the typed options-helper pattern
 
-## Open questions (need input, do not block plans 01–03)
+## Open questions
 
 1. Is the `crispen` npm name owned/reserved?
 2. Minimum supported versions: React ≥18 (for `useSyncExternalStore`) and

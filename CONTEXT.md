@@ -48,17 +48,20 @@ particular adapter.
   endpoint) into the browser. The embed is how the core learns the running
   identity without knowing which adapter produced it.
 - **Monitor** (`DeploymentMonitor`) — the headless runtime. It schedules and
-  deduplicates checks, evaluates the policy, holds state, and exposes
-  `check()` and `reload()`. One shared monitor exists per `DeploymentSource`;
-  consumers subscribe to it, they do not own it. No provider component exists.
-- **Check** — one resolution of the target plus one policy evaluation. A check
-  never rejects; failures land in state as `error`.
-- **Policy** (`DeploymentPolicy`) — a pure function
-  `(running, target) => "current" | "stale"`. Built-in: `exactMatch()`.
+  deduplicates checks, evaluates whether the running deployment is current,
+  holds state, and exposes `check()` and `reload()`. One shared monitor exists
+  per `DeploymentSource`; consumers subscribe to it, they do not own it. No
+  provider component exists.
+- **Check** — one resolution of the target plus one `isCurrent` evaluation. A
+  check never rejects; failures land in state as `error`.
+- **`isCurrent`** — an optional pure predicate `(running, target) => boolean`.
+  Exact deployment ID equality is the default.
 - **`DeploymentStatus`** — the state object consumers receive:
   `status` (`"unknown" | "current" | "stale"`), `isChecking`, `error`,
   `running`, `target`, `checkedAt`, `check()`, `reload()`. `status` is durable
   knowledge; `isChecking` and `error` are orthogonal axes and never erase it.
+  When `status` is `"current"` or `"stale"`, `target` and `checkedAt` are
+  non-null.
 - **Reload guard** — sessionStorage-based protection inside `reload()` that
   detects reloads which land back on the same running deployment and blocks
   reload loops.

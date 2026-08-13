@@ -53,3 +53,6 @@ jobs:
 
       - name: Build
         run: bun run build
+
+      - name: Verify entrypoint exports
+        run: bun scripts/verify-exports.ts
