@@ -30,11 +30,10 @@ export type NextConfigFunction = (
 
 export type NextConfigExport = NextConfig | NextConfigFunction
 
-const EMBED_ENVIRONMENT_KEY = "CRISPEN_NEXT_EMBED"
-const DESCRIPTOR_ENVIRONMENT_KEY = "CRISPEN_NEXT_DESCRIPTOR"
-
 export function CrispenScript(): ReactNode {
-  const embed = process.env[EMBED_ENVIRONMENT_KEY]
+  // Next inlines `NextConfig.env` values only for literal `process.env.KEY`
+  // member accesses, so these reads must not go through a computed key.
+  const embed = process.env.CRISPEN_NEXT_EMBED
   if (embed === undefined || embed.length === 0) {
     return null
   }
@@ -49,7 +48,7 @@ export function CrispenScript(): ReactNode {
 }
 
 export function GET(): Response {
-  const descriptor = process.env[DESCRIPTOR_ENVIRONMENT_KEY]
+  const descriptor = process.env.CRISPEN_NEXT_DESCRIPTOR
 
   return new Response(descriptor ?? '{"error":"descriptor unavailable"}', {
     headers: {
@@ -61,7 +60,7 @@ export function GET(): Response {
 }
 
 export function crispenPagesHandler(_request: NextApiRequest, response: NextApiResponse): void {
-  const descriptor = process.env[DESCRIPTOR_ENVIRONMENT_KEY]
+  const descriptor = process.env.CRISPEN_NEXT_DESCRIPTOR
   response.setHeader("Cache-Control", "no-store")
   response.setHeader("Content-Type", "application/json; charset=utf-8")
   response
@@ -97,8 +96,8 @@ export function withCrispen(
       ...resolvedConfig,
       env: {
         ...resolvedConfig.env,
-        [DESCRIPTOR_ENVIRONMENT_KEY]: development ? "" : serializeDescriptor(deployment),
-        [EMBED_ENVIRONMENT_KEY]: development ? "" : serializeEmbed(embed),
+        CRISPEN_NEXT_DESCRIPTOR: development ? "" : serializeDescriptor(deployment),
+        CRISPEN_NEXT_EMBED: development ? "" : serializeEmbed(embed),
       },
       headers:
         descriptorHeader === undefined

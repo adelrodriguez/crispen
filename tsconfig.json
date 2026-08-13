@@ -11,7 +11,13 @@
     "moduleResolution": "bundler",
     "noEmit": true,
     "verbatimModuleSyntax": true,
-    "types": ["bun"]
+    "types": ["bun"],
+    "paths": {
+      "crispen": ["./src/index.ts"],
+      "crispen/react": ["./src/integrations/react/index.ts"],
+      "crispen/vite": ["./src/adapters/vite/index.ts"],
+      "crispen/next": ["./src/adapters/next/index.ts"]
+    }
   },
   "include": ["src", "scripts", "e2e", "*.config.ts"],
   "exclude": ["node_modules", "dist", ".packref"]

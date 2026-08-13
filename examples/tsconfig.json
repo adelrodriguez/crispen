@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "noUncheckedSideEffectImports": false,
+    "types": []
+  },
+  "include": ["lab.tsx", "vite-react/src", "vite-react/vite.config.ts"],
+  "exclude": ["nextjs", "vite-react/builds", "vite-react/serve"]
+}

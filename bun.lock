@@ -36,6 +36,7 @@
     "examples/nextjs": {
       "name": "@crispen/nextjs-lab",
       "dependencies": {
+        "crispen": "file:../..",
         "next": "16.3.0",
         "react": "19.2.8",
         "react-dom": "19.2.8",
@@ -48,6 +49,7 @@
     "examples/vite-react": {
       "name": "@crispen/vite-react-lab",
       "dependencies": {
+        "crispen": "file:../..",
         "react": "19.2.8",
         "react-dom": "19.2.8",
       },
@@ -641,6 +643,8 @@
     "cluster-key-slot": ["cluster-key-slot@1.1.1", "", {}, "sha512-rwHwUfXL40Chm1r08yrhU3qpUvdVlgkKNeyeGPOxnW8/SyVDvgRaed/Uz54AqWNaTCAThlj6QAs3TZcKI0xDEw=="],
 
     "coffi": ["coffi@0.1.37", "", { "dependencies": { "strip-json-comments": "^5.0.3" } }, "sha512-ewO5Xis7sw7g54yI/3lJ/nNV90Er4ZnENeDORZjrs58T70MmwKFLZgevraNCz+RmB4KDKsYT1ui1wDB36iPWqQ=="],
+
+    "crispen": ["pastry@root:", {}],
 
     "cross-spawn": ["cross-spawn@7.0.6", "", { "dependencies": { "path-key": "^3.1.0", "shebang-command": "^2.0.0", "which": "^2.0.1" } }, "sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA=="],
 

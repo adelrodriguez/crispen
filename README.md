@@ -212,7 +212,7 @@ The options are:
 | `target`        | `null` for `unknown`; otherwise `Deployment` | Last successfully resolved target. `status` narrows this field.                                                    |
 | `checkedAt`     | `null` for `unknown`; otherwise `Date`       | Time of the last successful check. `status` narrows this field.                                                    |
 | `reloadBlocked` | `boolean`                                    | The reload guard stopped a repeated mixed-version loop. The guard is inactive when session storage is unavailable. |
-| `check()`       | `Promise<void>`                              | Check now. It never rejects.                                                                                       |
+| `check()`       | `Promise<DeploymentStatus>`                  | Check now. It never rejects, and resolves with the resulting status.                                               |
 | `reload()`      | `void`                                       | Request a guarded page reload.                                                                                     |
 
 ## Headless API

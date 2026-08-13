@@ -1,5 +1,5 @@
 import path from "node:path"
-import { withCrispen } from "../../dist/adapters/next/index.js"
+import { withCrispen } from "crispen/next"
 
 const directory = import.meta.dirname
 const webpackAliases = {

@@ -44,9 +44,9 @@ export function CrispenLab({ adapter }: { readonly adapter: "Next.js" | "Vite" }
   useEffect(() => {
     if (new URLSearchParams(globalThis.location.search).get("seam") === "1") {
       globalThis.window.__crispenLab = getDefaultMonitor()
-      return () => {
-        delete globalThis.window.__crispenLab
-      }
+    }
+    return () => {
+      delete globalThis.window.__crispenLab
     }
   }, [])
 

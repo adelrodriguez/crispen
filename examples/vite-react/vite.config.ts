@@ -1,8 +1,8 @@
 import { resolve } from "node:path"
 import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
+import { crispen } from "crispen/vite"
 import { defineConfig } from "vite"
-import { crispen } from "../../dist/adapters/vite/index.js"
 
 export default defineConfig({
   build: {
