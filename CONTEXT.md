@@ -57,11 +57,14 @@ particular adapter.
 - **`isCurrent`** — an optional pure predicate `(running, target) => boolean`.
   Exact deployment ID equality is the default.
 - **`DeploymentStatus`** — the state object consumers receive:
-  `status` (`"unknown" | "current" | "stale"`), `isChecking`, `error`,
+  `status` (`"unknown" | "current" | "stale"`), `checkStatus` (`"checking" |
+"idle"`), `reloadStatus` (`"ready" | "blocked" | "unprotected"`), `error`,
   `running`, `target`, `checkedAt`, `check()`, `reload()`. `status` is durable
-  knowledge; `isChecking` and `error` are orthogonal axes and never erase it.
+  knowledge; `checkStatus`, `reloadStatus`, and `error` are orthogonal axes and
+  never erase it.
   When `status` is `"current"` or `"stale"`, `target` and `checkedAt` are
   non-null.
 - **Reload guard** — sessionStorage-based protection inside `reload()` that
   detects reloads which land back on the same running deployment and blocks
-  reload loops.
+  reload loops. `reloadStatus` is `"unprotected"` when session storage is
+  unavailable or a storage operation fails.

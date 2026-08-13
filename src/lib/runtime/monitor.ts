@@ -2,7 +2,6 @@ import type { Deployment, DeploymentSource, IsDeploymentCurrent } from "../proto
 import type { RuntimeEnvironment } from "./environment"
 import type { DeploymentSchedule } from "./scheduler"
 import { createBrowserEnvironment } from "./environment"
-import { clearSuccessfulReload, requestReload } from "./reload-guard"
 import {
   DEFAULT_DEPLOYMENT_SCHEDULE,
   DeploymentScheduler,
@@ -10,12 +9,15 @@ import {
 } from "./scheduler"
 import { Subscribable } from "./subscribable"
 
+export type CheckStatus = "checking" | "idle"
+export type ReloadStatus = "blocked" | "ready" | "unprotected"
+
 interface DeploymentStatusBase {
   readonly check: () => Promise<DeploymentStatus>
+  readonly checkStatus: CheckStatus
   readonly error: Error | null
-  readonly isChecking: boolean
   readonly reload: () => void
-  readonly reloadBlocked: boolean
+  readonly reloadStatus: ReloadStatus
   readonly running: Deployment
 }
 
@@ -34,12 +36,29 @@ export type DeploymentStatus = DeploymentStatusBase &
   )
 
 type DeploymentStatusChanges = Partial<
-  Pick<DeploymentStatusBase, "error" | "isChecking" | "reloadBlocked">
+  Pick<DeploymentStatusBase, "checkStatus" | "error" | "reloadStatus">
 >
 
+interface ReloadMarker {
+  readonly at: number
+  readonly attempts: number
+  readonly from: string
+  readonly to: string
+}
+
+export const DEFAULT_CHECK_TIMEOUT = 30_000
+
+const RELOAD_MARKER_KEY = "crispen:reload"
+const RELOAD_COOLDOWN = 10 * 60_000
+
 export interface DeploymentMonitorOptions {
+  readonly checkTimeout?: number
   readonly environment?: RuntimeEnvironment
   readonly isCurrent?: IsDeploymentCurrent
+}
+
+interface InternalMonitorOptions extends DeploymentMonitorOptions {
+  readonly onDestroy?: () => void
 }
 
 export interface DeploymentSubscriberOptions {
@@ -65,10 +84,12 @@ class DeploymentMonitorImplementation
   extends Subscribable<(state: DeploymentStatus) => void, DeploymentSubscriberOptions>
   implements DeploymentMonitor
 {
+  readonly #checkTimeout: number
   readonly #defaultIsCurrent: IsDeploymentCurrent
   #isCurrent: IsDeploymentCurrent
   readonly #source: DeploymentSource | undefined
   readonly #environment: RuntimeEnvironment
+  readonly #reloadGuard: ReloadGuard
   #abortController: AbortController | undefined
   #destroyed = false
   readonly #onDestroy: (() => void) | undefined
@@ -76,17 +97,16 @@ class DeploymentMonitorImplementation
   readonly #scheduler: DeploymentScheduler
   #state: DeploymentStatus
 
-  constructor(
-    source: DeploymentSource | undefined,
-    options: DeploymentMonitorOptions,
-    onDestroy?: () => void
-  ) {
+  constructor(source: DeploymentSource | undefined, options: InternalMonitorOptions) {
     super()
+    this.#checkTimeout = options.checkTimeout ?? DEFAULT_CHECK_TIMEOUT
     this.#environment = options.environment ?? createBrowserEnvironment()
-    this.#defaultIsCurrent = options.isCurrent ?? isExactDeployment
+    this.#defaultIsCurrent = options.isCurrent ?? ((running, target) => running.id === target.id)
     this.#isCurrent = this.#defaultIsCurrent
-    this.#onDestroy = onDestroy
+    this.#onDestroy = options.onDestroy
     this.#source = source
+    const running = source?.running ?? { id: "" }
+    this.#reloadGuard = new ReloadGuard(running, this.#environment)
     if (source === undefined && process.env.NODE_ENV !== "production" && "document" in globalThis) {
       // eslint-disable-next-line no-console -- Missing adapter data must be visible in development.
       console.warn("Crispen is inert because no adapter registered a deployment embed.")
@@ -96,16 +116,15 @@ class DeploymentMonitorImplementation
     })
     this.#state = {
       check: this.check.bind(this),
+      checkStatus: "idle",
       checkedAt: null,
       error: null,
-      isChecking: false,
       reload: this.reload.bind(this),
-      reloadBlocked: false,
-      running: source?.running ?? { id: "" },
+      reloadStatus: this.#reloadGuard.status,
+      running,
       status: "unknown",
       target: null,
     }
-    clearSuccessfulReload(this.#state.running, this.#environment)
   }
 
   check(): Promise<DeploymentStatus> {
@@ -115,50 +134,80 @@ class DeploymentMonitorImplementation
     }
 
     if (this.#inFlight !== undefined) {
-      return this.#inFlight
+      return this.#abortController?.signal.aborted === true
+        ? this.#inFlight.then(() => this.check())
+        : this.#inFlight
     }
 
     const abortController = new AbortController()
     this.#abortController = abortController
-    this.#inFlight = this.#performCheck(source, abortController.signal).finally(() => {
-      const shouldRestart = abortController.signal.aborted && this.#shouldCheckOnSubscribe()
+    this.#inFlight = this.#performCheck(source, abortController).finally(() => {
       if (this.#abortController === abortController) {
         this.#abortController = undefined
       }
       this.#inFlight = undefined
-      if (shouldRestart) {
-        void this.check()
-      }
     })
 
     return this.#inFlight
   }
 
-  async #performCheck(source: DeploymentSource, signal: AbortSignal): Promise<DeploymentStatus> {
-    this.#updateState({ isChecking: true })
+  async #performCheck(
+    source: DeploymentSource,
+    abortController: AbortController
+  ): Promise<DeploymentStatus> {
+    this.#updateState({ checkStatus: "checking" })
     try {
-      const target = await source.resolveTarget(signal)
-      this.#setState({
-        ...this.#state,
-        checkedAt: new Date(this.#environment.now()),
-        error: null,
-        isChecking: false,
-        reloadBlocked: this.#state.reloadBlocked && this.#state.target?.id === target.id,
-        status: this.#isCurrent(source.running, target) ? "current" : "stale",
-        target,
-      })
-    } catch (error) {
-      if (signal.aborted) {
-        this.#updateState({ isChecking: false })
-        return this.#state
+      const target = await this.#resolveTarget(source, abortController)
+      if (target === null) {
+        this.#updateState({ checkStatus: "idle" })
+      } else {
+        this.#setState({
+          ...this.#state,
+          checkStatus: "idle",
+          checkedAt: new Date(this.#environment.now()),
+          error: null,
+          reloadStatus: this.#reloadGuard.reconcile(this.#state.target?.id === target.id),
+          status: this.#isCurrent(source.running, target) ? "current" : "stale",
+          target,
+        })
       }
-
+    } catch (error) {
       this.#updateState({
+        checkStatus: "idle",
         error: error instanceof Error ? error : new Error(String(error)),
-        isChecking: false,
       })
     }
+
     return this.#state
+  }
+
+  async #resolveTarget(
+    source: DeploymentSource,
+    abortController: AbortController
+  ): Promise<Deployment | null> {
+    let timeoutHandle: unknown
+    const cancelled = new Promise<null>((resolve) => {
+      abortController.signal.addEventListener(
+        "abort",
+        () => {
+          this.#environment.clearTimeout(timeoutHandle)
+          resolve(null)
+        },
+        { once: true }
+      )
+    })
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timeoutHandle = this.#environment.setTimeout(() => {
+        reject(new Error(`Crispen deployment check timed out after ${this.#checkTimeout}ms.`))
+        abortController.abort()
+      }, this.#checkTimeout)
+    })
+
+    try {
+      return await Promise.race([cancelled, source.resolveTarget(abortController.signal), timeout])
+    } finally {
+      this.#environment.clearTimeout(timeoutHandle)
+    }
   }
 
   destroy(): void {
@@ -182,9 +231,9 @@ class DeploymentMonitorImplementation
       return
     }
 
-    const reloadBlocked = requestReload(this.#state.running, this.#state.target, this.#environment)
-    if (reloadBlocked !== this.#state.reloadBlocked) {
-      this.#updateState({ reloadBlocked })
+    const reloadStatus = this.#reloadGuard.request(this.#state.target)
+    if (reloadStatus !== this.#state.reloadStatus) {
+      this.#updateState({ reloadStatus })
     }
   }
 
@@ -193,7 +242,9 @@ class DeploymentMonitorImplementation
     options: DeploymentSubscriberOptions = {}
   ): () => void {
     if (this.#destroyed) {
-      return noopUnsubscribe
+      return () => {
+        // A destroyed monitor has no subscription to remove.
+      }
     }
 
     return super.subscribe(listener, options)
@@ -204,18 +255,17 @@ class DeploymentMonitorImplementation
       return
     }
 
-    const schedule = this.#reconcileSchedule()
-    this.#reconcileIsCurrent()
+    const schedule = this.#reconcile()
     this.#scheduler.update(schedule)
 
-    if (this.listeners.size === 1 && this.#shouldCheckOnSubscribe()) {
+    if (this.listeners.size === 1 && schedule.checkOnSubscribe) {
       void this.check()
     }
   }
 
   protected override onUnsubscribe(): void {
+    const schedule = this.#reconcile()
     if (this.listeners.size === 0) {
-      this.#isCurrent = this.#defaultIsCurrent
       const abortController = this.#abortController
       void Promise.resolve().then(() => {
         if (this.listeners.size === 0 && this.#abortController === abortController) {
@@ -227,49 +277,39 @@ class DeploymentMonitorImplementation
       return
     }
 
-    this.#reconcileIsCurrent()
-    this.#scheduler.update(this.#reconcileSchedule())
+    this.#scheduler.update(schedule)
   }
 
-  #reconcileSchedule(): DeploymentSchedule {
-    const options = [...this.listeners].map(({ options: subscriberOptions }) => subscriberOptions)
-    const requestedInterval = Math.min(
-      ...options.map(
-        ({ checkInterval }) => checkInterval ?? DEFAULT_DEPLOYMENT_SCHEDULE.checkInterval
-      )
-    )
+  #reconcile(): DeploymentSchedule {
+    let checkInterval = Number.POSITIVE_INFINITY
+    let checkOnReconnect = false
+    let checkOnSubscribe = false
+    let checkOnVisible = false
+    let isCurrent: IsDeploymentCurrent | undefined
 
-    if (requestedInterval < MINIMUM_CHECK_INTERVAL) {
+    for (const { options } of this.listeners) {
+      checkInterval = Math.min(
+        checkInterval,
+        options.checkInterval ?? DEFAULT_DEPLOYMENT_SCHEDULE.checkInterval
+      )
+      checkOnReconnect ||= options.checkOnReconnect ?? DEFAULT_DEPLOYMENT_SCHEDULE.checkOnReconnect
+      checkOnSubscribe ||= options.checkOnSubscribe ?? DEFAULT_DEPLOYMENT_SCHEDULE.checkOnSubscribe
+      checkOnVisible ||= options.checkOnVisible ?? DEFAULT_DEPLOYMENT_SCHEDULE.checkOnVisible
+      isCurrent ??= options.isCurrent
+    }
+
+    this.#isCurrent = isCurrent ?? this.#defaultIsCurrent
+    if (checkInterval < MINIMUM_CHECK_INTERVAL) {
       // eslint-disable-next-line no-console -- Excessive polling is a deployment configuration error.
       console.warn(`Crispen increased checkInterval to ${MINIMUM_CHECK_INTERVAL}ms.`)
     }
 
     return {
-      checkInterval: Math.max(requestedInterval, MINIMUM_CHECK_INTERVAL),
-      checkOnReconnect: options.some(
-        ({ checkOnReconnect }) => checkOnReconnect ?? DEFAULT_DEPLOYMENT_SCHEDULE.checkOnReconnect
-      ),
-      checkOnSubscribe: options.some(
-        ({ checkOnSubscribe }) => checkOnSubscribe ?? DEFAULT_DEPLOYMENT_SCHEDULE.checkOnSubscribe
-      ),
-      checkOnVisible: options.some(
-        ({ checkOnVisible }) => checkOnVisible ?? DEFAULT_DEPLOYMENT_SCHEDULE.checkOnVisible
-      ),
+      checkInterval: Math.max(checkInterval, MINIMUM_CHECK_INTERVAL),
+      checkOnReconnect,
+      checkOnSubscribe,
+      checkOnVisible,
     }
-  }
-
-  #reconcileIsCurrent(): void {
-    this.#isCurrent =
-      [...this.listeners]
-        .map(({ options }) => options.isCurrent)
-        .find((isCurrent) => isCurrent !== undefined) ?? this.#defaultIsCurrent
-  }
-
-  #shouldCheckOnSubscribe(): boolean {
-    return [...this.listeners].some(
-      ({ options: { checkOnSubscribe } }) =>
-        checkOnSubscribe ?? DEFAULT_DEPLOYMENT_SCHEDULE.checkOnSubscribe
-    )
   }
 
   #updateState(changes: DeploymentStatusChanges): void {
@@ -284,12 +324,115 @@ class DeploymentMonitorImplementation
   }
 }
 
-function noopUnsubscribe(): void {
-  return undefined
-}
+class ReloadGuard {
+  readonly #environment: RuntimeEnvironment
+  readonly #running: Deployment
+  #status: ReloadStatus
 
-function isExactDeployment(running: Deployment, target: Deployment): boolean {
-  return running.id === target.id
+  constructor(running: Deployment, environment: RuntimeEnvironment) {
+    this.#environment = environment
+    this.#running = running
+    this.#status =
+      environment.storage === null
+        ? "unprotected"
+        : this.#clearSuccessfulReload(environment.storage)
+  }
+
+  get status(): ReloadStatus {
+    return this.#status
+  }
+
+  reconcile(targetMatches: boolean): ReloadStatus {
+    if (this.#status !== "unprotected" && !(this.#status === "blocked" && targetMatches)) {
+      this.#status = "ready"
+    }
+
+    return this.#status
+  }
+
+  request(target: Deployment | null): ReloadStatus {
+    const storage = this.#environment.storage
+    if (storage === null || this.#status === "unprotected" || target === null) {
+      this.#environment.reload()
+      return this.#status
+    }
+
+    this.#status = this.#requestReload(target, storage)
+    return this.#status
+  }
+
+  #clearSuccessfulReload(storage: NonNullable<RuntimeEnvironment["storage"]>): ReloadStatus {
+    try {
+      const marker = ReloadGuard.#readReloadMarker(storage)
+      if (marker !== undefined && marker.from !== this.#running.id) {
+        storage.removeItem(RELOAD_MARKER_KEY)
+      }
+
+      return "ready"
+    } catch {
+      return "unprotected"
+    }
+  }
+
+  static #readReloadMarker(
+    storage: NonNullable<RuntimeEnvironment["storage"]>
+  ): ReloadMarker | undefined {
+    const value = storage.getItem(RELOAD_MARKER_KEY)
+    if (value === null) {
+      return undefined
+    }
+
+    try {
+      const marker = JSON.parse(value) as Partial<ReloadMarker>
+      if (
+        typeof marker.at !== "number" ||
+        typeof marker.attempts !== "number" ||
+        typeof marker.from !== "string" ||
+        typeof marker.to !== "string"
+      ) {
+        return undefined
+      }
+
+      return marker as ReloadMarker
+    } catch {
+      return undefined
+    }
+  }
+
+  #requestReload(
+    target: Deployment,
+    storage: NonNullable<RuntimeEnvironment["storage"]>
+  ): ReloadStatus {
+    let attempts: number
+    try {
+      const previous = ReloadGuard.#readReloadMarker(storage)
+      const repeated =
+        previous !== undefined &&
+        previous.from === this.#running.id &&
+        previous.to === target.id &&
+        this.#environment.now() - previous.at < RELOAD_COOLDOWN
+      attempts = repeated ? previous.attempts + 1 : 0
+      storage.setItem(
+        RELOAD_MARKER_KEY,
+        JSON.stringify({
+          at: this.#environment.now(),
+          attempts,
+          from: this.#running.id,
+          to: target.id,
+        } satisfies ReloadMarker)
+      )
+    } catch {
+      this.#environment.reload()
+      return "unprotected"
+    }
+
+    if (attempts >= 2) {
+      return "blocked"
+    }
+
+    this.#environment.reload()
+    return "ready"
+  }
 }
 
 export function createDeploymentMonitor(
@@ -303,5 +446,5 @@ export function createRegisteredDeploymentMonitor(
   source: DeploymentSource | undefined,
   onDestroy: () => void
 ): DeploymentMonitor {
-  return new DeploymentMonitorImplementation(source, {}, onDestroy)
+  return new DeploymentMonitorImplementation(source, { onDestroy })
 }

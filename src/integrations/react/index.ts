@@ -56,10 +56,10 @@ function getServerState(monitor: DeploymentMonitor): DeploymentStatus {
   const state = monitor.getState()
   const serverState: DeploymentStatus = {
     ...state,
+    checkStatus: "idle",
     checkedAt: null,
     error: null,
-    isChecking: false,
-    reloadBlocked: false,
+    reloadStatus: "unprotected",
     status: "unknown",
     target: null,
   }
@@ -68,8 +68,10 @@ function getServerState(monitor: DeploymentMonitor): DeploymentStatus {
 }
 
 export type {
+  CheckStatus,
   DeploymentMonitor,
   DeploymentStatus,
   DeploymentSubscriberOptions,
+  ReloadStatus,
 } from "../../lib/runtime/monitor"
 export type { Deployment, DeploymentSource, IsDeploymentCurrent } from "../../lib/protocol/types"

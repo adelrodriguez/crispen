@@ -1,9 +1,12 @@
 import {
+  DEFAULT_CHECK_TIMEOUT,
   createDeploymentMonitor,
   createStaticSource,
   parseDescriptor,
+  type CheckStatus,
   type Deployment,
   type DeploymentMonitor,
+  type ReloadStatus,
   type RuntimeEnvironment,
 } from "crispen"
 import {
@@ -32,12 +35,15 @@ const nextConfig: NextConfigExport = withCrispen({}, {
 const hookOptions = {} satisfies DeploymentStatusOptions
 const declarationContract = {
   appRoute: GET,
+  checkStatus: undefined as unknown as CheckStatus,
+  checkTimeout: DEFAULT_CHECK_TIMEOUT,
   environment: undefined as unknown as RuntimeEnvironment,
   hookOptions,
   hookStatus: undefined as unknown as DeploymentStatus,
   monitor,
   nextConfig,
   pagesRoute: crispenPagesHandler,
+  reloadStatus: undefined as unknown as ReloadStatus,
   scriptComponent: CrispenScript,
   statusHook: useDeploymentStatus,
   vitePlugin,

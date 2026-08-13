@@ -13,14 +13,11 @@ Vite and Next.js adapters.
 
 | Plan                                                                    | Delivers                                          | Depends on             |
 | ----------------------------------------------------------------------- | ------------------------------------------------- | ---------------------- |
-| [08-runtime-resilience](./08-runtime-resilience.md)                     | Subscriber predicate policy and check timeout     | Current runtime        |
 | [09-adapter-edge-coverage](./09-adapter-edge-coverage.md)               | Endpoint tables and Pages Router production check | Current adapters       |
-| [10-react-lifecycle-coverage](./10-react-lifecycle-coverage.md)         | Option-change and hook reload coverage            | 08                     |
+| [10-react-lifecycle-coverage](./10-react-lifecycle-coverage.md)         | Option-change and hook reload coverage            | Current runtime        |
 | [11-conditional-descriptor-fetch](./11-conditional-descriptor-fetch.md) | Conditional descriptor requests with ETags        | Current protocol layer |
 
-Plans 08, 09, and 11 can run in parallel. In plan 08, settle subscriber predicate
-policy before adding the check timeout. Plan 10 starts after plan 08 because its
-option-change test depends on the shared predicate contract.
+Plans 09, 10, and 11 can run in parallel.
 
 ## Decisions already made
 
@@ -28,8 +25,9 @@ These were settled in design discussion. Plans reference them; do not
 re-litigate them inside a plan.
 
 1. **State axes are split.** `status` (`"unknown" | "current" | "stale"`) is
-   durable knowledge. `isChecking` and `error` are orthogonal fields. A
-   re-check or a failed check never erases known staleness.
+   durable knowledge. `checkStatus` (`"checking" | "idle"`), `reloadStatus`
+   (`"ready" | "blocked" | "unprotected"`), and `error` are orthogonal fields.
+   A re-check or a failed check never erases known staleness.
 2. **Two protocol conventions.** The descriptor
    (`/_crispen/deployment.json`, versioned wire format) carries the target.
    The embed (`globalThis.__CRISPEN__`) carries the running identity and

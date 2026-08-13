@@ -1,6 +1,6 @@
 import { describe, expect, it, spyOn } from "bun:test"
+import { FakeEnvironment } from "../../../tests/helpers"
 import { createDeploymentMonitor } from "../runtime/monitor"
-import { FakeEnvironment } from "../test-support/fake-environment"
 
 function noop(): boolean {
   return false
@@ -33,6 +33,26 @@ describe("deployment scheduler", () => {
     expect(environment.listenerCount("visibilitychange")).toBe(0)
     expect(environment.listenerCount("pageshow")).toBe(0)
     expect(environment.listenerCount("online")).toBe(0)
+  })
+
+  it("honors a check interval above the default", () => {
+    const environment = new FakeEnvironment()
+    const monitor = createDeploymentMonitor(
+      {
+        resolveTarget: () => Promise.resolve({ id: "running" }),
+        running: { id: "running" },
+      },
+      { environment }
+    )
+
+    const unsubscribe = monitor.subscribe(noop, {
+      checkInterval: 600_000,
+      checkOnSubscribe: false,
+    })
+
+    expect(environment.intervalDelays).toEqual([600_000])
+
+    unsubscribe()
   })
 
   it("uses the shortest interval and trigger union across subscribers", () => {
