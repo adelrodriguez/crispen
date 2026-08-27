@@ -31,6 +31,13 @@ particular adapter.
 
 - **Deployment** — an identified build of the application. Shape:
   `{ id: string, builtAt?: Date }`.
+- **Deployment ID strategy** — the adapter rule that selects the running
+  deployment ID. It accepts a literal string, a named platform, one or more
+  environment variables, or a resolver function. Without an explicit option,
+  adapters detect Vercel, Cloudflare Pages, Netlify, then GitHub Actions. They
+  read only the detected platform's commit ID, then fall back to `GIT_SHA` and
+  a random ID. An explicit strategy does not use these fallbacks. It warns and
+  uses a random ID when it cannot resolve a value.
 - **Running deployment** — the deployment that produced the JavaScript
   currently executing in this client. Immutable for the life of the page.
 - **Target deployment** — the deployment this client should currently be

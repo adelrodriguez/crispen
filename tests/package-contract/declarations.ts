@@ -22,15 +22,22 @@ import {
   type DeploymentStatus,
   type DeploymentStatusOptions,
 } from "crispen/react"
-import { crispen, type CrispenViteOptions } from "crispen/vite"
+import {
+  crispen,
+  type CrispenViteOptions,
+  type DeploymentIdOption,
+  type DeploymentPlatform,
+} from "crispen/vite"
 
 const deployment: Deployment = parseDescriptor('{"v":1,"id":"package-contract"}')
 const monitor: DeploymentMonitor = createDeploymentMonitor(
   createStaticSource(deployment, deployment)
 )
-const vitePlugin = crispen({ deploymentId: deployment.id } satisfies CrispenViteOptions)
+const platform: DeploymentPlatform = "vercel"
+const deploymentIdOption: DeploymentIdOption = { platform }
+const vitePlugin = crispen({ deploymentId: deploymentIdOption } satisfies CrispenViteOptions)
 const nextConfig: NextConfigExport = withCrispen({}, {
-  deploymentId: deployment.id,
+  deploymentId: { env: ["CRISPEN_SHA", "GIT_SHA"] },
 } satisfies CrispenNextOptions)
 const hookOptions = {} satisfies DeploymentStatusOptions
 const declarationContract = {
