@@ -203,17 +203,20 @@ The options are:
 
 `DeploymentStatus` has these fields:
 
-| Field           | Type                                         | Meaning                                                                                                            |
-| --------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `status`        | `"unknown" \| "current" \| "stale"`          | Last successful deployment comparison.                                                                             |
-| `isChecking`    | `boolean`                                    | A target check is active.                                                                                          |
-| `error`         | `Error \| null`                              | The last resolution error. A failed check does not erase durable status.                                           |
-| `running`       | `Deployment`                                 | Identity embedded in the current page.                                                                             |
-| `target`        | `null` for `unknown`; otherwise `Deployment` | Last successfully resolved target. `status` narrows this field.                                                    |
-| `checkedAt`     | `null` for `unknown`; otherwise `Date`       | Time of the last successful check. `status` narrows this field.                                                    |
-| `reloadBlocked` | `boolean`                                    | The reload guard stopped a repeated mixed-version loop. The guard is inactive when session storage is unavailable. |
-| `check()`       | `Promise<DeploymentStatus>`                  | Check now. It never rejects, and resolves with the resulting status.                                               |
-| `reload()`      | `void`                                       | Request a guarded page reload.                                                                                     |
+| Field          | Type                                         | Meaning                                                                                                 |
+| -------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `status`       | `"unknown" \| "current" \| "stale"`          | Last successful deployment comparison.                                                                  |
+| `checkStatus`  | `"checking" \| "idle"`                       | Whether a target check is active.                                                                       |
+| `error`        | `Error \| null`                              | The last resolution error. A failed check does not erase durable status.                                |
+| `running`      | `Deployment`                                 | Identity embedded in the current page.                                                                  |
+| `target`       | `null` for `unknown`; otherwise `Deployment` | Last successfully resolved target. `status` narrows this field.                                         |
+| `checkedAt`    | `null` for `unknown`; otherwise `Date`       | Time of the last successful check. `status` narrows this field.                                         |
+| `reloadStatus` | `"ready" \| "blocked" \| "unprotected"`      | State of the reload guard. An unprotected reload remains available when session storage is unavailable. |
+| `check()`      | `Promise<DeploymentStatus>`                  | Check now. It never rejects, and resolves with the resulting status.                                    |
+| `reload()`     | `void`                                       | Request a guarded page reload.                                                                          |
+
+During server rendering, `reloadStatus` is always `"unprotected"` because
+session storage is not available.
 
 ## Headless API
 
@@ -245,7 +248,8 @@ The headless exports are:
 
 - `createDeploymentMonitor(source?, options?)` creates an independent
   monitor. `options.environment` supplies the deterministic runtime seam,
-  and `options.isCurrent` changes how deployments are compared.
+  `options.isCurrent` changes how deployments are compared, and
+  `options.checkTimeout` changes the target-resolution timeout.
 - `getDefaultMonitor()` returns the lazy monitor from the build embed.
 - `getMonitor(source)` returns one shared monitor for each source object.
 
@@ -258,19 +262,28 @@ The headless exports are:
   returns `undefined` when no valid embed exists.
 - `createBrowserEnvironment()` is not public. Implement `RuntimeEnvironment`
   only for tests or a non-browser runtime and pass it to the monitor.
+- `DEFAULT_CHECK_TIMEOUT` is the default target-resolution timeout.
 
 `DeploymentMonitor` provides `getState`, `subscribe`, `check`, `reload`, and
 `destroy`. Destruction is terminal: later subscriptions, checks, and reloads
 are inert. A registry lookup after destruction returns a new monitor.
 Subscriber options use the same schedule fields as the React hook.
 When several subscribers differ, Crispen uses the shortest interval and the
-union of enabled triggers. The first supplied subscriber `isCurrent` predicate has priority.
+union of enabled triggers. The earliest currently active subscriber with an
+explicit `isCurrent` predicate has priority. Subscribers without a predicate do
+not take priority. All subscribers see the same verdict.
 
-The root also exports these types: `Deployment`, `DeploymentSource`,
-`HttpSourceInit`, `IsDeploymentCurrent`, `DeploymentStatus`, `DeploymentMonitor`,
-`DeploymentMonitorOptions`, `DeploymentSubscriberOptions`,
-`RuntimeEnvironment`, `RuntimeEvent`, `RuntimeEventType`, and
-`RuntimeStorage`.
+A check times out after `DEFAULT_CHECK_TIMEOUT` (30 seconds) unless an
+independent monitor sets `options.checkTimeout`. The timeout must be a finite
+number of milliseconds and cannot be disabled. A timeout aborts target
+resolution, records an error, and preserves the last known status, target, and
+check time. A later check can recover.
+
+The root also exports these types: `CheckStatus`, `Deployment`,
+`DeploymentSource`, `ReloadStatus`, `HttpSourceInit`, `IsDeploymentCurrent`,
+`DeploymentStatus`, `DeploymentMonitor`, `DeploymentMonitorOptions`,
+`DeploymentSubscriberOptions`, `RuntimeEnvironment`, `RuntimeEvent`,
+`RuntimeEventType`, and `RuntimeStorage`.
 
 ## Descriptor protocol
 

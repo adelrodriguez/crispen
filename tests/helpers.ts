@@ -3,7 +3,7 @@ import type {
   RuntimeEvent,
   RuntimeEventType,
   RuntimeStorage,
-} from "../runtime/environment"
+} from "../src/lib/runtime/environment"
 
 export class MemoryStorage implements RuntimeStorage {
   readonly #values = new Map<string, string>()
@@ -24,7 +24,9 @@ export class MemoryStorage implements RuntimeStorage {
 export class FakeEnvironment implements RuntimeEnvironment {
   readonly #intervals = new Map<number, { callback: () => void; delay: number }>()
   readonly #listeners = new Map<RuntimeEventType, Set<(event: RuntimeEvent) => void>>()
+  readonly #timeouts = new Map<number, { callback: () => void; delay: number }>()
   #nextInterval = 1
+  #nextTimeout = 1
   #now = 0
   #visible = true
   intervalStarts = 0
@@ -45,6 +47,10 @@ export class FakeEnvironment implements RuntimeEnvironment {
     this.#intervals.delete(handle as number)
   }
 
+  clearTimeout(handle: unknown): void {
+    this.#timeouts.delete(handle as number)
+  }
+
   fire(type: RuntimeEventType, event: RuntimeEvent = {}): void {
     for (const listener of this.#listeners.get(type) ?? []) {
       listener(event)
@@ -53,6 +59,14 @@ export class FakeEnvironment implements RuntimeEnvironment {
 
   fireIntervals(): void {
     for (const { callback } of this.#intervals.values()) {
+      callback()
+    }
+  }
+
+  fireTimeouts(): void {
+    const timeouts = [...this.#timeouts.values()]
+    this.#timeouts.clear()
+    for (const { callback } of timeouts) {
       callback()
     }
   }
@@ -89,11 +103,22 @@ export class FakeEnvironment implements RuntimeEnvironment {
     return handle
   }
 
+  setTimeout(callback: () => void, delay: number): unknown {
+    const handle = this.#nextTimeout
+    this.#nextTimeout += 1
+    this.#timeouts.set(handle, { callback, delay })
+    return handle
+  }
+
   setVisible(visible: boolean): void {
     this.#visible = visible
   }
 
   setNow(now: number): void {
     this.#now = now
+  }
+
+  get timeoutDelays(): number[] {
+    return [...this.#timeouts.values()].map(({ delay }) => delay)
   }
 }

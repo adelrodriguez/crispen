@@ -19,6 +19,6 @@
       "crispen/next": ["./src/adapters/next/index.ts"]
     }
   },
-  "include": ["src", "scripts", "e2e", "*.config.ts"],
+  "include": ["src", "scripts", "e2e", "*.config.ts", "tests/helpers.ts"],
   "exclude": ["node_modules", "dist", ".packref"]
 }

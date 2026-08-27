@@ -13,11 +13,13 @@ export interface RuntimeStorage {
 export interface RuntimeEnvironment {
   addEventListener(type: RuntimeEventType, listener: (event: RuntimeEvent) => void): void
   clearInterval(handle: unknown): void
+  clearTimeout(handle: unknown): void
   isVisible(): boolean
   now(): number
   reload(): void
   removeEventListener(type: RuntimeEventType, listener: (event: RuntimeEvent) => void): void
   setInterval(callback: () => void, milliseconds: number): unknown
+  setTimeout(callback: () => void, milliseconds: number): unknown
   readonly storage: RuntimeStorage | null
 }
 
@@ -39,6 +41,9 @@ export function createBrowserEnvironment(): RuntimeEnvironment {
     clearInterval: (handle) => {
       globalThis.clearInterval(handle as ReturnType<typeof setInterval>)
     },
+    clearTimeout: (handle) => {
+      globalThis.clearTimeout(handle as ReturnType<typeof setTimeout>)
+    },
     isVisible: () => browser.document?.visibilityState !== "hidden",
     now: () => Date.now(),
     reload: () => {
@@ -48,6 +53,7 @@ export function createBrowserEnvironment(): RuntimeEnvironment {
       browser.removeEventListener?.(type, listener)
     },
     setInterval: (callback, milliseconds) => globalThis.setInterval(callback, milliseconds),
+    setTimeout: (callback, milliseconds) => globalThis.setTimeout(callback, milliseconds),
     storage: readSessionStorage(browser),
   }
 }
