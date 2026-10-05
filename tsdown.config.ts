@@ -1,6 +1,7 @@
-import { defineConfig } from "bunup"
+import { defineConfig } from "tsdown"
 
 export default defineConfig({
+  clean: true,
   define: {
     "process.env.NODE_ENV": "process.env.NODE_ENV",
   },
@@ -11,8 +12,9 @@ export default defineConfig({
     "src/adapters/vite/index.ts",
     "src/adapters/next/index.ts",
   ],
-  format: "esm",
+  fixedExtension: false,
   outDir: "dist",
+  platform: "browser",
   sourcemap: true,
-  target: "browser",
+  tsconfig: "tsconfig.build.json",
 })

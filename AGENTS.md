@@ -40,10 +40,10 @@ User docs live in `docs/`, one mode per folder: `how-to/` for tasks, `reference/
 
 ## Repository rules
 
-- Use Bun for package management and scripts.
-- After edits, run `bun run test`, `bun run build`, `bun run check`, and `bun run format`.
-- After dependency, import, or export changes, run `bun run analyze` and `bun run test:exports`.
-- After runtime, integration, or adapter changes, run `bun run test:e2e`.
+- Use pnpm for package management and package scripts, and Node.js (the version in `.node-version`) for standalone scripts.
+- After edits, run `pnpm run fix`, `pnpm run test`, `pnpm run build`, and `pnpm run check`.
+- After dependency, import, or export changes, run `pnpm run analyze` and `pnpm run test:exports`.
+- After runtime, integration, or adapter changes, run `pnpm run test:e2e`.
 - Keep tests in a `__tests__/` folder next to the code under test. Only `e2e/` and `tests/package-contract/` live outside `src/`.
 - Keep the protocol in `src/lib/protocol/`, the headless runtime in `src/lib/runtime/`, integrations in `src/integrations/<library>/`, and adapters in `src/adapters/<tool>/`.
 - Import in one direction only: `src/lib/protocol/`, then `src/lib/runtime/`, then `src/integrations/`. Adapters import only from `src/lib/protocol/` and `src/adapters/shared.ts`. An integration never imports an adapter.
@@ -58,10 +58,9 @@ User docs live in `docs/`, one mode per folder: `how-to/` for tasks, `reference/
 This project uses Adamantite for its managed formatting, linting, type checking, and dependency-analysis setup.
 
 - Prefer the package scripts Adamantite added for this workspace.
-- Run `bun run format` after editing files. Direct command: `adamantite format`.
-- Run `bun run check` to catch lint and type issues. Direct command: `adamantite check`.
-- Run `bun run fix` to apply safe lint fixes. Direct command: `adamantite fix`.
-- Run `bun run analyze` after changing dependencies, imports, or exports. Direct command: `adamantite analyze`.
+- Run `pnpm run check` to catch lint and type issues. Direct command: `adamantite check`.
+- Run `pnpm run fix` to apply safe lint fixes. Direct command: `adamantite fix`.
+- Run `pnpm run analyze` after changing dependencies, imports, or exports. Direct command: `adamantite analyze`.
 - Use `adamantite doctor` to inspect managed setup and `adamantite doctor --fix` for safe local fixes.
 
 <!-- ADAMANTITE:END -->

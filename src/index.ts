@@ -17,6 +17,7 @@ export type {
   RuntimeEvent,
   RuntimeEventType,
   RuntimeStorage,
+  TimerHandle,
 } from "./lib/runtime/environment"
 export { DEFAULT_CHECK_TIMEOUT, createDeploymentMonitor } from "./lib/runtime/monitor"
 export type {

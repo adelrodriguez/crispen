@@ -1,4 +1,4 @@
-import { buildExample, buildPackage, EXAMPLES } from "./example-build"
+import { buildExample, buildPackage, EXAMPLES } from "./example-build.ts"
 
 await buildPackage()
 await buildAllExamples([...EXAMPLES])

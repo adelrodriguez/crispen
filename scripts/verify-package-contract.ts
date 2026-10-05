@@ -1,22 +1,21 @@
+import { spawn } from "node:child_process"
 import { rm } from "node:fs/promises"
 import { resolve } from "node:path"
 
 const projectRoot = resolve(import.meta.dirname, "..")
 
 await rm(resolve(projectRoot, "dist"), { force: true, recursive: true })
-await run("bun", "run", "build")
+await run("pnpm", "run", "build")
 await run("node", "tests/package-contract/runtime.mjs")
-await run("bun", "x", "tsc", "--project", "tests/package-contract/tsconfig.json")
+await run("pnpm", "exec", "tsc", "--project", "tests/package-contract/tsconfig.json")
 
-async function run(...command: [string, ...string[]]): Promise<void> {
-  const child = Bun.spawn(command, {
-    cwd: projectRoot,
-    stderr: "inherit",
-    stdin: "inherit",
-    stdout: "inherit",
+async function run(executable: string, ...arguments_: string[]): Promise<void> {
+  const child = spawn(executable, arguments_, { cwd: projectRoot, stdio: "inherit" })
+  const exitCode = await new Promise<number | null>((resolve, reject) => {
+    child.once("error", reject)
+    child.once("exit", resolve)
   })
-  const exitCode = await child.exited
   if (exitCode !== 0) {
-    process.exit(exitCode)
+    process.exit(exitCode ?? 1)
   }
 }

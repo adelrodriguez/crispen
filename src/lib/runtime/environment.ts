@@ -1,3 +1,5 @@
+export type TimerHandle = number | ReturnType<typeof globalThis.setTimeout>
+
 export type RuntimeEventType = "online" | "pageshow" | "visibilitychange"
 
 export interface RuntimeEvent {
@@ -12,14 +14,14 @@ export interface RuntimeStorage {
 
 export interface RuntimeEnvironment {
   addEventListener(type: RuntimeEventType, listener: (event: RuntimeEvent) => void): void
-  clearInterval(handle: unknown): void
-  clearTimeout(handle: unknown): void
+  clearInterval(handle: TimerHandle): void
+  clearTimeout(handle: TimerHandle): void
   isVisible(): boolean
   now(): number
   reload(): void
   removeEventListener(type: RuntimeEventType, listener: (event: RuntimeEvent) => void): void
-  setInterval(callback: () => void, milliseconds: number): unknown
-  setTimeout(callback: () => void, milliseconds: number): unknown
+  setInterval(callback: () => void, milliseconds: number): TimerHandle
+  setTimeout(callback: () => void, milliseconds: number): TimerHandle
   readonly storage: RuntimeStorage | null
 }
 
@@ -32,17 +34,17 @@ interface BrowserGlobals {
 }
 
 export function createBrowserEnvironment(): RuntimeEnvironment {
-  const browser = globalThis as unknown as BrowserGlobals
+  const browser: BrowserGlobals = globalThis
 
   return {
     addEventListener: (type, listener) => {
       browser.addEventListener?.(type, listener)
     },
     clearInterval: (handle) => {
-      globalThis.clearInterval(handle as ReturnType<typeof setInterval>)
+      globalThis.clearInterval(handle)
     },
     clearTimeout: (handle) => {
-      globalThis.clearTimeout(handle as ReturnType<typeof setTimeout>)
+      globalThis.clearTimeout(handle)
     },
     isVisible: () => browser.document?.visibilityState !== "hidden",
     now: () => Date.now(),

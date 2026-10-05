@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useRef, useSyncExternalStore } from "react"
+import { useCallback, useState, useSyncExternalStore } from "react"
 import type { DeploymentSource } from "../../lib/protocol/types"
 import type {
   DeploymentMonitor,
@@ -29,19 +29,23 @@ export function useDeploymentStatus(options: DeploymentStatusOptions = {}): Depl
 }
 
 function useShallowStableOptions(options: DeploymentStatusOptions): DeploymentStatusOptions {
-  const stable = useRef(options)
-  if (!shallowEqual(stable.current, options)) {
-    stable.current = options
+  const [stable, setStable] = useState(options)
+  if (shallowEqual(stable, options)) {
+    return stable
   }
-  return stable.current
+
+  // Keep the new options from this render. React renders again with the new state.
+  setStable(options)
+  return options
 }
 
 function shallowEqual(first: DeploymentStatusOptions, second: DeploymentStatusOptions): boolean {
-  const firstKeys = Object.keys(first) as Array<keyof DeploymentStatusOptions>
-  const secondKeys = Object.keys(second) as Array<keyof DeploymentStatusOptions>
+  const firstEntries = Object.entries(first)
+  const secondValues = new Map(Object.entries(second))
 
   return (
-    firstKeys.length === secondKeys.length && firstKeys.every((key) => first[key] === second[key])
+    firstEntries.length === secondValues.size
+    && firstEntries.every(([key, value]) => value === secondValues.get(key))
   )
 }
 

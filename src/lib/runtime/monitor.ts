@@ -1,5 +1,5 @@
 import type { Deployment, DeploymentSource, IsDeploymentCurrent } from "../protocol/types"
-import type { RuntimeEnvironment } from "./environment"
+import type { RuntimeEnvironment, TimerHandle } from "./environment"
 import type { DeploymentSchedule } from "./scheduler"
 import { createBrowserEnvironment } from "./environment"
 import {
@@ -21,8 +21,8 @@ interface DeploymentStatusBase {
   readonly running: Deployment
 }
 
-export type DeploymentStatus = DeploymentStatusBase &
-  (
+export type DeploymentStatus = DeploymentStatusBase
+  & (
     | {
         readonly checkedAt: null
         readonly status: "unknown"
@@ -185,12 +185,12 @@ class DeploymentMonitorImplementation
     source: DeploymentSource,
     abortController: AbortController
   ): Promise<Deployment | null> {
-    let timeoutHandle: unknown
+    let timeoutHandle: TimerHandle | undefined
     const cancelled = new Promise<null>((resolve) => {
       abortController.signal.addEventListener(
         "abort",
         () => {
-          this.#environment.clearTimeout(timeoutHandle)
+          this.#clearTimeout(timeoutHandle)
           resolve(null)
         },
         { once: true }
@@ -206,7 +206,13 @@ class DeploymentMonitorImplementation
     try {
       return await Promise.race([cancelled, source.resolveTarget(abortController.signal), timeout])
     } finally {
-      this.#environment.clearTimeout(timeoutHandle)
+      this.#clearTimeout(timeoutHandle)
+    }
+  }
+
+  #clearTimeout(handle: TimerHandle | undefined): void {
+    if (handle !== undefined) {
+      this.#environment.clearTimeout(handle)
     }
   }
 
@@ -383,17 +389,9 @@ class ReloadGuard {
     }
 
     try {
-      const marker = JSON.parse(value) as Partial<ReloadMarker>
-      if (
-        typeof marker.at !== "number" ||
-        typeof marker.attempts !== "number" ||
-        typeof marker.from !== "string" ||
-        typeof marker.to !== "string"
-      ) {
-        return undefined
-      }
+      const marker: unknown = JSON.parse(value)
 
-      return marker as ReloadMarker
+      return checkIsReloadMarker(marker) ? marker : undefined
     } catch {
       return undefined
     }
@@ -407,10 +405,10 @@ class ReloadGuard {
     try {
       const previous = ReloadGuard.#readReloadMarker(storage)
       const repeated =
-        previous !== undefined &&
-        previous.from === this.#running.id &&
-        previous.to === target.id &&
-        this.#environment.now() - previous.at < RELOAD_COOLDOWN
+        previous !== undefined
+        && previous.from === this.#running.id
+        && previous.to === target.id
+        && this.#environment.now() - previous.at < RELOAD_COOLDOWN
       attempts = repeated ? previous.attempts + 1 : 0
       storage.setItem(
         RELOAD_MARKER_KEY,
@@ -447,4 +445,19 @@ export function createRegisteredDeploymentMonitor(
   onDestroy: () => void
 ): DeploymentMonitor {
   return new DeploymentMonitorImplementation(source, { onDestroy })
+}
+
+function checkIsReloadMarker(value: unknown): value is ReloadMarker {
+  return (
+    typeof value === "object"
+    && value !== null
+    && "at" in value
+    && typeof value.at === "number"
+    && "attempts" in value
+    && typeof value.attempts === "number"
+    && "from" in value
+    && typeof value.from === "string"
+    && "to" in value
+    && typeof value.to === "string"
+  )
 }

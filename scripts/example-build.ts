@@ -7,7 +7,7 @@ export type ExampleName = "nextjs" | "vite-react"
 export const EXAMPLES: ExampleName[] = ["vite-react", "nextjs"]
 
 export async function buildPackage(): Promise<void> {
-  await run(["bun", "run", "build"], process.cwd())
+  await run(["pnpm", "run", "build"], process.cwd())
 }
 
 export async function buildExample(example: ExampleName, id: string): Promise<string> {
@@ -18,12 +18,12 @@ export async function buildExample(example: ExampleName, id: string): Promise<st
   await removeBrokenServeLink(exampleRoot)
   try {
     if (example === "vite-react") {
-      await run(["bun", "run", "build"], exampleRoot, {
+      await run(["pnpm", "run", "build"], exampleRoot, {
         CRISPEN_DEPLOYMENT_ID: id,
         CRISPEN_OUT_DIR: staging,
       })
     } else {
-      await run(["bun", "run", "build"], exampleRoot, {
+      await run(["pnpm", "run", "build"], exampleRoot, {
         CRISPEN_DEPLOYMENT_ID: id,
       })
       await cp(join(exampleRoot, "out"), staging, { recursive: true })

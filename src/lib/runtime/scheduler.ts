@@ -1,4 +1,4 @@
-import type { RuntimeEnvironment, RuntimeEvent, RuntimeEventType } from "./environment"
+import type { RuntimeEnvironment, RuntimeEvent, RuntimeEventType, TimerHandle } from "./environment"
 
 export interface DeploymentSchedule {
   readonly checkInterval: number
@@ -19,7 +19,7 @@ export const MINIMUM_CHECK_INTERVAL = 10_000
 export class DeploymentScheduler {
   readonly #environment: RuntimeEnvironment
   readonly #check: () => void
-  #interval: unknown
+  #interval: TimerHandle | undefined
   #schedule: DeploymentSchedule | undefined
 
   constructor(environment: RuntimeEnvironment, check: () => void) {
@@ -101,9 +101,9 @@ export class DeploymentScheduler {
 
 function schedulesMatch(left: DeploymentSchedule, right: DeploymentSchedule): boolean {
   return (
-    left.checkInterval === right.checkInterval &&
-    left.checkOnReconnect === right.checkOnReconnect &&
-    left.checkOnSubscribe === right.checkOnSubscribe &&
-    left.checkOnVisible === right.checkOnVisible
+    left.checkInterval === right.checkInterval
+    && left.checkOnReconnect === right.checkOnReconnect
+    && left.checkOnSubscribe === right.checkOnSubscribe
+    && left.checkOnVisible === right.checkOnVisible
   )
 }

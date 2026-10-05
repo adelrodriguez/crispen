@@ -46,7 +46,7 @@ export function checkIsExternalEndpoint(endpoint: string): boolean {
 }
 
 export function resolveDeploymentId(option?: DeploymentIdOption): string {
-  if (option === undefined || typeof option === "string") {
+  if (checkIsDeploymentIdLiteral(option)) {
     return option !== undefined && option.length > 0 ? option : detectDeploymentId()
   }
 
@@ -63,8 +63,22 @@ export function resolveDeploymentId(option?: DeploymentIdOption): string {
   return randomDeploymentId()
 }
 
+function checkIsDeploymentIdLiteral(option?: DeploymentIdOption): option is string | undefined {
+  return option === undefined || typeof option === "string"
+}
+
+function checkIsDeploymentIdResolver(
+  option: Exclude<DeploymentIdOption, string>
+): option is () => string | undefined {
+  return typeof option === "function"
+}
+
+function checkIsVariableName(variables: string | readonly string[]): variables is string {
+  return typeof variables === "string"
+}
+
 function describeStrategy(option: Exclude<DeploymentIdOption, string>): string {
-  if (typeof option === "function") {
+  if (checkIsDeploymentIdResolver(option)) {
     return "the custom resolver"
   }
 
@@ -72,7 +86,7 @@ function describeStrategy(option: Exclude<DeploymentIdOption, string>): string {
     return `the ${option.platform} platform`
   }
 
-  const variables = typeof option.env === "string" ? [option.env] : option.env
+  const variables = checkIsVariableName(option.env) ? [option.env] : option.env
 
   return variables.length === 1
     ? `the ${variables[0]} environment variable`
@@ -84,9 +98,9 @@ function detectDeploymentId(): string {
     const strategy = PLATFORM_STRATEGIES[platform]
     if (strategy.detect(process.env)) {
       return (
-        strategy.resolve(process.env) ??
-        readEnvironmentVariable(process.env, "GIT_SHA") ??
-        randomDeploymentId()
+        strategy.resolve(process.env)
+        ?? readEnvironmentVariable(process.env, "GIT_SHA")
+        ?? randomDeploymentId()
       )
     }
   }
@@ -105,7 +119,7 @@ function readEnvironmentVariable(environment: NodeJS.ProcessEnv, name: string): 
 }
 
 function resolveStrategy(option: Exclude<DeploymentIdOption, string>): string | undefined {
-  if (typeof option === "function") {
+  if (checkIsDeploymentIdResolver(option)) {
     const value = option()
 
     return value !== undefined && value.length > 0 ? value : undefined
@@ -115,7 +129,7 @@ function resolveStrategy(option: Exclude<DeploymentIdOption, string>): string | 
     return PLATFORM_STRATEGIES[option.platform].resolve(process.env)
   }
 
-  const variables = typeof option.env === "string" ? [option.env] : option.env
+  const variables = checkIsVariableName(option.env) ? [option.env] : option.env
   for (const variable of variables) {
     const value = readEnvironmentVariable(process.env, variable)
     if (value !== undefined) {

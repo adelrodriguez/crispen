@@ -1,0 +1,6 @@
+packages:
+  - examples/nextjs
+  - examples/vite-react
+
+allowBuilds:
+  msgpackr-extract: false

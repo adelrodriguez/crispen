@@ -1,5 +1,5 @@
-import { describe, expect, it, spyOn } from "bun:test"
-import type { DeploymentSource } from "../../protocol/types"
+import { describe, expect, it, vi } from "vitest"
+import type { Deployment, DeploymentSource } from "../../protocol/types"
 import { FakeEnvironment, MemoryStorage } from "../../../../tests/helpers"
 import { DEFAULT_CHECK_TIMEOUT, createDeploymentMonitor } from "../monitor"
 
@@ -19,8 +19,72 @@ function neverSettles(): Promise<never> {
   })
 }
 
+function resolveRunning(): Promise<Deployment> {
+  return Promise.resolve({ id: "running" })
+}
+
+class ControlledSource implements DeploymentSource {
+  calls = 0
+  respond: () => Promise<Deployment>
+  readonly running: Deployment = { id: "running" }
+  signal: AbortSignal | undefined
+
+  constructor(respond: () => Promise<Deployment>) {
+    this.respond = respond
+  }
+
+  resolveTarget = (signal: AbortSignal): Promise<Deployment> => {
+    this.calls += 1
+    this.signal = signal
+    return this.respond()
+  }
+}
+
+function createPredicateScheduleMonitor() {
+  const environment = new FakeEnvironment()
+  const monitor = createDeploymentMonitor(
+    {
+      resolveTarget: () => Promise.resolve({ id: "running" }),
+      running: { id: "running" },
+    },
+    { environment }
+  )
+  const unsubscribePriority = monitor.subscribe(noop, {
+    checkInterval: 30_000,
+    checkOnReconnect: false,
+    checkOnSubscribe: false,
+    checkOnVisible: false,
+    isCurrent: () => true,
+  })
+  const unsubscribeSchedule = monitor.subscribe(noop, {
+    checkInterval: 20_000,
+    checkOnReconnect: true,
+    checkOnSubscribe: false,
+    checkOnVisible: true,
+    isCurrent: () => false,
+  })
+
+  return { environment, monitor, unsubscribePriority, unsubscribeSchedule }
+}
+
+async function loadStalePageAndReload(environment: FakeEnvironment) {
+  const monitor = createDeploymentMonitor(
+    {
+      resolveTarget: () => Promise.resolve({ id: "B" }),
+      running: { id: "A" },
+    },
+    { environment }
+  )
+  await monitor.check()
+  monitor.reload()
+
+  return monitor
+}
+
 describe("deployment monitor", () => {
   it("starts with stable unknown state for the running deployment", () => {
+    expect.assertions(2)
+
     const source: DeploymentSource = {
       resolveTarget: () => Promise.resolve({ id: "running" }),
       running: { id: "running" },
@@ -41,6 +105,8 @@ describe("deployment monitor", () => {
   })
 
   it("uses the configured isCurrent predicate", async () => {
+    expect.assertions(1)
+
     const monitor = createDeploymentMonitor(
       {
         resolveTarget: () => Promise.resolve({ id: "running" }),
@@ -55,6 +121,8 @@ describe("deployment monitor", () => {
   })
 
   it("uses the earliest active explicit subscriber predicate for one shared verdict", async () => {
+    expect.assertions(2)
+
     const monitor = createDeploymentMonitor({
       resolveTarget: () => Promise.resolve({ id: "running" }),
       running: { id: "running" },
@@ -79,6 +147,8 @@ describe("deployment monitor", () => {
   })
 
   it("skips option-free subscribers when it selects the active predicate", async () => {
+    expect.assertions(1)
+
     const monitor = createDeploymentMonitor({
       resolveTarget: () => Promise.resolve({ id: "running" }),
       running: { id: "running" },
@@ -97,6 +167,8 @@ describe("deployment monitor", () => {
   })
 
   it("returns to the monitor default after all explicit predicates leave", async () => {
+    expect.assertions(2)
+
     const monitor = createDeploymentMonitor({
       resolveTarget: () => Promise.resolve({ id: "running" }),
       running: { id: "running" },
@@ -117,40 +189,35 @@ describe("deployment monitor", () => {
     unsubscribeDefault()
   })
 
-  it("keeps schedule reconciliation independent from predicate priority", async () => {
-    const environment = new FakeEnvironment()
-    const monitor = createDeploymentMonitor(
-      {
-        resolveTarget: () => Promise.resolve({ id: "running" }),
-        running: { id: "running" },
-      },
-      { environment }
-    )
-    const unsubscribePriority = monitor.subscribe(noop, {
-      checkInterval: 30_000,
-      checkOnReconnect: false,
-      checkOnSubscribe: false,
-      checkOnVisible: false,
-      isCurrent: () => true,
-    })
-    const unsubscribeSchedule = monitor.subscribe(noop, {
-      checkInterval: 20_000,
-      checkOnReconnect: true,
-      checkOnSubscribe: false,
-      checkOnVisible: true,
-      isCurrent: () => false,
-    })
+  it("keeps the subscriber schedule union while the earliest predicate decides", async () => {
+    expect.assertions(4)
+
+    const { environment, monitor, unsubscribePriority, unsubscribeSchedule } =
+      createPredicateScheduleMonitor()
 
     await monitor.check()
+
     expect(monitor.getState().status).toBe("current")
-    expect(environment.intervalDelays).toEqual([20_000])
+    expect(environment.intervalDelays).toStrictEqual([20_000])
     expect(environment.listenerCount("online")).toBe(1)
     expect(environment.listenerCount("pageshow")).toBe(1)
 
     unsubscribePriority()
+    unsubscribeSchedule()
+  })
+
+  it("keeps the schedule when the priority predicate subscriber leaves", async () => {
+    expect.assertions(4)
+
+    const { environment, monitor, unsubscribePriority, unsubscribeSchedule } =
+      createPredicateScheduleMonitor()
+
     await monitor.check()
+    unsubscribePriority()
+    await monitor.check()
+
     expect(monitor.getState().status).toBe("stale")
-    expect(environment.intervalDelays).toEqual([20_000])
+    expect(environment.intervalDelays).toStrictEqual([20_000])
     expect(environment.listenerCount("online")).toBe(1)
     expect(environment.listenerCount("pageshow")).toBe(1)
 
@@ -158,6 +225,8 @@ describe("deployment monitor", () => {
   })
 
   it("keeps durable status while a successful check updates target knowledge", async () => {
+    expect.assertions(5)
+
     let resolveTarget: (deployment: { id: string }) => void = missingResolver
     const target = new Promise<{ id: string }>((resolve) => {
       resolveTarget = resolve
@@ -172,7 +241,7 @@ describe("deployment monitor", () => {
 
     const check = monitor.check()
 
-    expect(environment.timeoutDelays).toEqual([50])
+    expect(environment.timeoutDelays).toStrictEqual([50])
     expect(monitor.getState()).toMatchObject({
       checkStatus: "checking",
       status: "unknown",
@@ -189,10 +258,12 @@ describe("deployment monitor", () => {
       status: "current",
       target: { id: "running" },
     })
-    expect(environment.timeoutDelays).toEqual([])
+    expect(environment.timeoutDelays).toStrictEqual([])
   })
 
   it("keeps stale knowledge when a later check fails", async () => {
+    expect.assertions(3)
+
     const failure = new Error("offline")
     let target = Promise.resolve({ id: "target" })
     const source: DeploymentSource = {
@@ -224,6 +295,8 @@ describe("deployment monitor", () => {
   })
 
   it("notifies subscribers with a new immutable state for each change", async () => {
+    expect.assertions(3)
+
     const source: DeploymentSource = {
       resolveTarget: () => Promise.resolve({ id: "running" }),
       running: { id: "running" },
@@ -247,6 +320,8 @@ describe("deployment monitor", () => {
   })
 
   it("shares one target resolution across concurrent checks", async () => {
+    expect.assertions(4)
+
     let calls = 0
     let finish: (deployment: { id: string }) => void = missingResolver
     const target = new Promise<{ id: string }>((resolve) => {
@@ -274,6 +349,8 @@ describe("deployment monitor", () => {
   })
 
   it("aborts an in-flight check when the last subscriber leaves", async () => {
+    expect.assertions(4)
+
     let targetSignal: AbortSignal | undefined
     const monitor = createDeploymentMonitor({
       resolveTarget: (signal) => {
@@ -303,6 +380,8 @@ describe("deployment monitor", () => {
   })
 
   it("finishes a never-settling check when its timeout expires", async () => {
+    expect.assertions(3)
+
     const environment = new FakeEnvironment()
     const monitor = createDeploymentMonitor(
       {
@@ -322,51 +401,40 @@ describe("deployment monitor", () => {
       error: new Error("Crispen deployment check timed out after 50ms."),
       status: "unknown",
     })
-    expect(environment.timeoutDelays).toEqual([])
+    expect(environment.timeoutDelays).toStrictEqual([])
   })
 
   it("recovers after a timed-out source ignores abort", async () => {
-    let calls = 0
-    let signal: AbortSignal | undefined
+    expect.assertions(3)
+
+    const source = new ControlledSource(neverSettles)
     const environment = new FakeEnvironment()
-    const monitor = createDeploymentMonitor(
-      {
-        resolveTarget: (checkSignal) => {
-          calls += 1
-          signal = checkSignal
-          return calls === 1 ? neverSettles() : Promise.resolve({ id: "running" })
-        },
-        running: { id: "running" },
-      },
-      { checkTimeout: 50, environment }
-    )
+    const monitor = createDeploymentMonitor(source, { checkTimeout: 50, environment })
 
     const timedOut = monitor.check()
     environment.fireTimeouts()
     await timedOut
 
-    expect(signal?.aborted).toBe(true)
+    expect(source.signal?.aborted).toBe(true)
+
+    source.respond = resolveRunning
     const recovered = await monitor.check()
+
     expect(recovered).toMatchObject({ error: null, status: "current" })
-    expect(calls).toBe(2)
+    expect(source.calls).toBe(2)
   })
 
   it("preserves current and stale knowledge through later timeouts", async () => {
-    let shouldSettle = true
-    let targetId = "running"
+    expect.assertions(3)
+
+    const source = new ControlledSource(resolveRunning)
     const environment = new FakeEnvironment()
     environment.setNow(TEST_TIME)
-    const monitor = createDeploymentMonitor(
-      {
-        resolveTarget: () => (shouldSettle ? Promise.resolve({ id: targetId }) : neverSettles()),
-        running: { id: "running" },
-      },
-      { checkTimeout: 50, environment }
-    )
+    const monitor = createDeploymentMonitor(source, { checkTimeout: 50, environment })
 
     await monitor.check()
     const currentState = monitor.getState()
-    shouldSettle = false
+    source.respond = neverSettles
     const currentTimeout = monitor.check()
     environment.fireTimeouts()
     await currentTimeout
@@ -376,14 +444,13 @@ describe("deployment monitor", () => {
       target: { id: "running" },
     })
 
-    shouldSettle = true
-    targetId = "target"
+    source.respond = () => Promise.resolve({ id: "target" })
     environment.setNow(TEST_TIME + 1)
     await monitor.check()
     expect(monitor.getState()).toMatchObject({ error: null, status: "stale" })
 
     const staleState = monitor.getState()
-    shouldSettle = false
+    source.respond = neverSettles
     const staleTimeout = monitor.check()
     environment.fireTimeouts()
     await staleTimeout
@@ -395,26 +462,20 @@ describe("deployment monitor", () => {
   })
 
   it("ignores a late result from a timed-out check", async () => {
-    let calls = 0
+    expect.assertions(1)
+
     let finishFirst: (deployment: { id: string }) => void = missingResolver
     const firstTarget = new Promise<{ id: string }>((resolve) => {
       finishFirst = resolve
     })
+    const source = new ControlledSource(() => firstTarget)
     const environment = new FakeEnvironment()
-    const monitor = createDeploymentMonitor(
-      {
-        resolveTarget: () => {
-          calls += 1
-          return calls === 1 ? firstTarget : Promise.resolve({ id: "newer" })
-        },
-        running: { id: "running" },
-      },
-      { checkTimeout: 50, environment }
-    )
+    const monitor = createDeploymentMonitor(source, { checkTimeout: 50, environment })
 
     const firstCheck = monitor.check()
     environment.fireTimeouts()
     await firstCheck
+    source.respond = () => Promise.resolve({ id: "newer" })
     await monitor.check()
 
     finishFirst({ id: "running" })
@@ -423,36 +484,56 @@ describe("deployment monitor", () => {
     expect(monitor.getState()).toMatchObject({ status: "stale", target: { id: "newer" } })
   })
 
-  it("clears timeout work after last unsubscribe and destruction", async () => {
+  it("clears timeout work after the last unsubscribe", async () => {
+    expect.assertions(4)
+
     const environment = new FakeEnvironment()
-    const source: DeploymentSource = {
-      resolveTarget: neverSettles,
-      running: { id: "running" },
-    }
-    const monitor = createDeploymentMonitor(source, { environment })
+    const monitor = createDeploymentMonitor(
+      { resolveTarget: neverSettles, running: { id: "running" } },
+      { environment }
+    )
     const unsubscribe = monitor.subscribe(noop, { checkOnSubscribe: false })
     const cancelledCheck = monitor.check()
 
-    expect(environment.timeoutDelays).toEqual([DEFAULT_CHECK_TIMEOUT])
+    expect(environment.timeoutDelays).toStrictEqual([DEFAULT_CHECK_TIMEOUT])
+
     unsubscribe()
     await Promise.resolve()
-    expect(environment.intervalDelays).toEqual([])
-    expect(environment.timeoutDelays).toEqual([])
+
+    expect(environment.intervalDelays).toStrictEqual([])
+    expect(environment.timeoutDelays).toStrictEqual([])
+
     await cancelledCheck
+
     expect(monitor.getState().error).toBeNull()
+  })
 
-    const destroyedMonitor = createDeploymentMonitor(source, { environment })
-    destroyedMonitor.subscribe(noop, { checkOnSubscribe: false })
-    const destroyedCheck = destroyedMonitor.check()
-    destroyedMonitor.destroy()
+  it("clears timeout work after destruction", async () => {
+    expect.assertions(4)
 
-    expect(environment.intervalDelays).toEqual([])
-    expect(environment.timeoutDelays).toEqual([])
+    const environment = new FakeEnvironment()
+    const monitor = createDeploymentMonitor(
+      { resolveTarget: neverSettles, running: { id: "running" } },
+      { environment }
+    )
+    monitor.subscribe(noop, { checkOnSubscribe: false })
+    const destroyedCheck = monitor.check()
+
+    expect(environment.timeoutDelays).toStrictEqual([DEFAULT_CHECK_TIMEOUT])
+
+    monitor.destroy()
+
+    expect(environment.intervalDelays).toStrictEqual([])
+    expect(environment.timeoutDelays).toStrictEqual([])
+
     await destroyedCheck
-    expect(destroyedMonitor.getState().error).toBeNull()
+
+    expect(monitor.getState().error).toBeNull()
   })
 
   it("shares the result of a timed-out check across concurrent callers", async () => {
+    expect.assertions(3)
+
     const environment = new FakeEnvironment()
     const monitor = createDeploymentMonitor(
       {
@@ -474,8 +555,10 @@ describe("deployment monitor", () => {
   })
 
   it("stays inert without an embedded deployment source", async () => {
+    expect.assertions(5)
+
     let warned = false
-    const warning = spyOn(console, "warn").mockImplementation(() => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {
       warned = true
     })
     const environment = new FakeEnvironment()
@@ -487,7 +570,7 @@ describe("deployment monitor", () => {
     expect(warned).toBe(false)
     expect(result).toBe(monitor.getState())
     expect(result.status).toBe("unknown")
-    expect(environment.intervalDelays).toEqual([])
+    expect(environment.intervalDelays).toStrictEqual([])
     expect(environment.listenerCount("visibilitychange")).toBe(0)
 
     unsubscribe()
@@ -495,6 +578,8 @@ describe("deployment monitor", () => {
   })
 
   it("stays terminal after destruction", async () => {
+    expect.assertions(5)
+
     let checks = 0
     const environment = new FakeEnvironment()
     const monitor = createDeploymentMonitor(
@@ -518,7 +603,7 @@ describe("deployment monitor", () => {
 
     expect(result).toBe(state)
     expect(checks).toBe(0)
-    expect(environment.intervalDelays).toEqual([])
+    expect(environment.intervalDelays).toStrictEqual([])
     expect(environment.listenerCount("visibilitychange")).toBe(0)
     expect(environment.reloadCalls).toBe(0)
 
@@ -527,6 +612,8 @@ describe("deployment monitor", () => {
   })
 
   it("keeps the initial check through Strict Mode subscription churn", async () => {
+    expect.assertions(3)
+
     let calls = 0
     let finish: (deployment: { id: string }) => void = missingResolver
     let targetSignal: AbortSignal | undefined
@@ -561,65 +648,54 @@ describe("deployment monitor", () => {
   })
 
   it("starts a fresh check when Strict Mode resubscribes after cancellation", async () => {
-    let calls = 0
-    const monitor = createDeploymentMonitor({
-      resolveTarget: () => {
-        calls += 1
-        return calls === 1 ? neverSettles() : Promise.resolve({ id: "running" })
-      },
-      running: { id: "running" },
-    })
+    expect.assertions(3)
+
+    const source = new ControlledSource(neverSettles)
+    const monitor = createDeploymentMonitor(source)
 
     const unsubscribeFirst = monitor.subscribe(noop)
     const cancelledCheck = monitor.check()
     unsubscribeFirst()
     await Promise.resolve()
 
+    source.respond = resolveRunning
     const unsubscribeSecond = monitor.subscribe(noop)
     const result = await monitor.check()
 
-    expect(await cancelledCheck).toMatchObject({ checkStatus: "idle", status: "unknown" })
+    await expect(cancelledCheck).resolves.toMatchObject({ checkStatus: "idle", status: "unknown" })
     expect(result).toMatchObject({ error: null, status: "current" })
-    expect(calls).toBe(2)
+    expect(source.calls).toBe(2)
 
     unsubscribeSecond()
   })
 
   describe("reload", () => {
     it("blocks a third reload that repeatedly lands on the same deployment", async () => {
+      expect.assertions(4)
+
       const storage = new MemoryStorage()
       const environment = new FakeEnvironment(storage)
 
-      for (let attempt = 1; attempt <= 3; attempt += 1) {
-        const monitor = createDeploymentMonitor(
-          {
-            resolveTarget: () => Promise.resolve({ id: "B" }),
-            running: { id: "A" },
-          },
-          { environment }
-        )
-        // eslint-disable-next-line no-await-in-loop -- Each iteration models the next page load.
-        await monitor.check()
-        monitor.reload()
+      const first = await loadStalePageAndReload(environment)
 
-        expect(monitor.getState().reloadStatus).toBe(attempt === 3 ? "blocked" : "ready")
-      }
+      expect(first.getState().reloadStatus).toBe("ready")
 
+      const second = await loadStalePageAndReload(environment)
+
+      expect(second.getState().reloadStatus).toBe("ready")
+
+      const third = await loadStalePageAndReload(environment)
+
+      expect(third.getState().reloadStatus).toBe("blocked")
       expect(environment.reloadCalls).toBe(2)
     })
 
     it("clears the marker after reload advances to the target deployment", async () => {
+      expect.assertions(3)
+
       const storage = new MemoryStorage()
       const environment = new FakeEnvironment(storage)
-      const staleMonitor = createDeploymentMonitor(
-        {
-          resolveTarget: () => Promise.resolve({ id: "B" }),
-          running: { id: "A" },
-        },
-        { environment }
-      )
-      await staleMonitor.check()
-      staleMonitor.reload()
+      await loadStalePageAndReload(environment)
 
       createDeploymentMonitor(
         {
@@ -629,25 +705,20 @@ describe("deployment monitor", () => {
         { environment }
       )
 
-      for (let attempt = 1; attempt <= 2; attempt += 1) {
-        const monitor = createDeploymentMonitor(
-          {
-            resolveTarget: () => Promise.resolve({ id: "B" }),
-            running: { id: "A" },
-          },
-          { environment }
-        )
-        // eslint-disable-next-line no-await-in-loop -- Each iteration models the next page load.
-        await monitor.check()
-        monitor.reload()
+      const first = await loadStalePageAndReload(environment)
 
-        expect(monitor.getState().reloadStatus).toBe("ready")
-      }
+      expect(first.getState().reloadStatus).toBe("ready")
+
+      const second = await loadStalePageAndReload(environment)
+
+      expect(second.getState().reloadStatus).toBe("ready")
 
       expect(environment.reloadCalls).toBe(3)
     })
 
     it("starts unprotected when session storage cannot be read", async () => {
+      expect.assertions(3)
+
       const environment = new FakeEnvironment({
         getItem: () => {
           throw new Error("storage unavailable")
@@ -676,6 +747,8 @@ describe("deployment monitor", () => {
     })
 
     it("becomes unprotected when session storage cannot be written", async () => {
+      expect.assertions(4)
+
       const environment = new FakeEnvironment({
         getItem: () => null,
         removeItem: () => {
@@ -705,6 +778,8 @@ describe("deployment monitor", () => {
     })
 
     it("starts unprotected when a successful reload marker cannot be cleared", () => {
+      expect.assertions(1)
+
       const environment = new FakeEnvironment({
         getItem: () => JSON.stringify({ at: 0, attempts: 0, from: "A", to: "B" }),
         removeItem: () => {
@@ -726,6 +801,8 @@ describe("deployment monitor", () => {
     })
 
     it("ignores a malformed reload marker without disabling protection", () => {
+      expect.assertions(1)
+
       const environment = new FakeEnvironment({
         getItem: () => "not-json",
         removeItem: () => {
@@ -747,6 +824,8 @@ describe("deployment monitor", () => {
     })
 
     it("reloads without protection when session storage is unavailable", async () => {
+      expect.assertions(2)
+
       const environment = new FakeEnvironment(null)
       const monitor = createDeploymentMonitor(
         {
@@ -764,37 +843,23 @@ describe("deployment monitor", () => {
     })
 
     it("starts a new reload sequence after the cooldown", async () => {
+      expect.assertions(2)
+
       const storage = new MemoryStorage()
       const environment = new FakeEnvironment(storage)
-      for (let attempt = 1; attempt <= 2; attempt += 1) {
-        const monitor = createDeploymentMonitor(
-          {
-            resolveTarget: () => Promise.resolve({ id: "B" }),
-            running: { id: "A" },
-          },
-          { environment }
-        )
-        // eslint-disable-next-line no-await-in-loop -- Each iteration models the next page load.
-        await monitor.check()
-        monitor.reload()
-      }
+      await loadStalePageAndReload(environment)
+      await loadStalePageAndReload(environment)
 
       environment.setNow(10 * 60_000)
-      const monitor = createDeploymentMonitor(
-        {
-          resolveTarget: () => Promise.resolve({ id: "B" }),
-          running: { id: "A" },
-        },
-        { environment }
-      )
-      await monitor.check()
-      monitor.reload()
+      const monitor = await loadStalePageAndReload(environment)
 
       expect(environment.reloadCalls).toBe(3)
       expect(monitor.getState().reloadStatus).toBe("ready")
     })
 
     it("clears a blocked reload when the target deployment changes", async () => {
+      expect.assertions(2)
+
       const storage = new MemoryStorage()
       const environment = new FakeEnvironment(storage)
       let target = "B"

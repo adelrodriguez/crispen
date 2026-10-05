@@ -1,6 +1,6 @@
 import { resolve } from "node:path"
-import { activateBuild } from "../scripts/deployment-files"
-import { buildExample, buildPackage, EXAMPLES } from "../scripts/example-build"
+import { activateBuild } from "../scripts/deployment-files.ts"
+import { buildExample, buildPackage, EXAMPLES } from "../scripts/example-build.ts"
 
 export default async function globalSetup(): Promise<void> {
   await buildPackage()

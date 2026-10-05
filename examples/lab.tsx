@@ -1,15 +1,7 @@
 "use client"
 
-import type { DeploymentMonitor } from "crispen"
-import { getDefaultMonitor } from "crispen"
 import { useDeploymentStatus } from "crispen/react"
-import { useEffect, useState } from "react"
-
-declare global {
-  interface Window {
-    __crispenLab?: DeploymentMonitor
-  }
-}
+import { formatTime, useEventLedger, useLabSeam } from "./use-lab"
 
 const DEFAULT_INTERVAL = 10_000
 const BUTTON_CLASS =
@@ -29,26 +21,8 @@ export function CrispenLab({ adapter }: { readonly adapter: "Next.js" | "Vite" }
     checkOnReconnect: true,
     checkOnVisible: true,
   })
-  const [events, setEvents] = useState<string[]>([])
-
-  useEffect(() => {
-    const target = deployment.target?.id ?? "—"
-    setEvents((current) =>
-      [`${formatTime(new Date())} · ${deployment.status} · target ${target}`, ...current].slice(
-        0,
-        12
-      )
-    )
-  }, [deployment.checkedAt, deployment.error, deployment.status, deployment.target])
-
-  useEffect(() => {
-    if (new URLSearchParams(globalThis.location.search).get("seam") === "1") {
-      globalThis.window.__crispenLab = getDefaultMonitor()
-    }
-    return () => {
-      delete globalThis.window.__crispenLab
-    }
-  }, [])
+  const events = useEventLedger(deployment)
+  useLabSeam()
 
   return (
     <main className="min-h-dvh min-w-80 bg-[#edf3f7] [background-image:linear-gradient(#14232b0a_1px,transparent_1px),linear-gradient(90deg,#14232b0a_1px,transparent_1px)] bg-[size:24px_24px] text-[#14232b] antialiased">
@@ -144,9 +118,9 @@ export function CrispenLab({ adapter }: { readonly adapter: "Next.js" | "Vite" }
                 className="m-0 max-h-64 list-none overflow-auto p-0 font-mono text-[0.78rem] tabular-nums"
                 aria-live="polite"
               >
-                {events.map((event, index) => (
-                  <li className="border-b border-[#c8d4da] py-2.5" key={`${event}-${index}`}>
-                    {event}
+                {events.map((event) => (
+                  <li className="border-b border-[#c8d4da] py-2.5" key={event.id}>
+                    {event.text}
                   </li>
                 ))}
               </ol>
@@ -202,10 +176,6 @@ function Reading({
       </dd>
     </div>
   )
-}
-
-function formatTime(date: Date): string {
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
 }
 
 function readInterval(): number {
