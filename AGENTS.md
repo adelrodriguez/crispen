@@ -9,15 +9,15 @@ ubiquitous language in these files.
 
 ### Issue tracker
 
-Issues and PRDs are tracked as GitHub issues at `adelrodriguez/pastry`. See `docs/agents/issue-tracker.md`.
+Issues, PRDs, and implementation plans are tracked as GitHub issues at `adelrodriguez/crispen`. Use the `gh` CLI. Do not keep plans as Markdown files in the repo.
 
 ### Triage labels
 
-Use the default five-role triage vocabulary. See `docs/agents/triage-labels.md`.
+Use the default five-role triage vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix`.
 
 ### Domain docs
 
-Use the single-context domain-doc layout. See `docs/agents/domain.md`.
+Use the single-context domain-doc layout: one `GLOSSARY.md` at the repo root. Record architectural decisions as ADRs in `docs/adr/`.
 
 <!-- ADAMANTITE:START -->
 
