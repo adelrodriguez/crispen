@@ -45,6 +45,21 @@ function InlineStatus({ source }: { readonly source: DeploymentSource }) {
   return <output>{deployment.status}</output>
 }
 
+function InlinePredicateStatus({
+  label,
+  source,
+}: {
+  readonly label: string
+  readonly source: DeploymentSource
+}): React.ReactNode {
+  const deployment = useDeploymentStatus({
+    checkOnSubscribe: false,
+    isCurrent: (running, target) => running.id !== target.id,
+    source,
+  })
+  return <output>{`${label}:${deployment.status}`}</output>
+}
+
 function assertStale(
   state: DeploymentStatus | undefined
 ): asserts state is DeploymentStatus & { readonly status: "stale" } {
@@ -177,6 +192,26 @@ describe("react deployment integration", () => {
     expectTypeOf(state.status).toEqualTypeOf<"stale">()
     expectTypeOf(state.target).toEqualTypeOf<{ readonly builtAt?: Date; readonly id: string }>()
     expectTypeOf(state.checkedAt).toEqualTypeOf<Date>()
+  })
+
+  it("applies an inline isCurrent predicate across parent rerenders", async () => {
+    expect.assertions(2)
+    setupDom()
+    const source: DeploymentSource = {
+      resolveTarget: () => Promise.resolve({ id: "running" }),
+      running: { id: "running" },
+    }
+
+    const view = render(<InlinePredicateStatus label="first" source={source} />)
+    view.rerender(<InlinePredicateStatus label="second" source={source} />)
+
+    expect(view.getByText("second:unknown")).toBeDefined()
+
+    await act(async () => {
+      await getMonitor(source).check()
+    })
+
+    expect(view.getByText("second:stale")).toBeDefined()
   })
 
   it("keeps a stale notice mounted throughout a later check", async () => {

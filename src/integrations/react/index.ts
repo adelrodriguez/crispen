@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useState, useSyncExternalStore } from "react"
+import { useCallback, useMemo, useSyncExternalStore } from "react"
 import type { DeploymentSource } from "../../lib/protocol/types"
 import type {
   DeploymentMonitor,
@@ -29,23 +29,23 @@ export function useDeploymentStatus(options: DeploymentStatusOptions = {}): Depl
 }
 
 function useShallowStableOptions(options: DeploymentStatusOptions): DeploymentStatusOptions {
-  const [stable, setStable] = useState(options)
-  if (shallowEqual(stable, options)) {
-    return stable
-  }
-
-  // Keep the new options from this render. React renders again with the new state.
-  setStable(options)
-  return options
-}
-
-function shallowEqual(first: DeploymentStatusOptions, second: DeploymentStatusOptions): boolean {
-  const firstEntries = Object.entries(first)
-  const secondValues = new Map(Object.entries(second))
-
-  return (
-    firstEntries.length === secondValues.size
-    && firstEntries.every(([key, value]) => value === secondValues.get(key))
+  return useMemo(
+    () => ({
+      checkInterval: options.checkInterval,
+      checkOnReconnect: options.checkOnReconnect,
+      checkOnSubscribe: options.checkOnSubscribe,
+      checkOnVisible: options.checkOnVisible,
+      isCurrent: options.isCurrent,
+      source: options.source,
+    }),
+    [
+      options.checkInterval,
+      options.checkOnReconnect,
+      options.checkOnSubscribe,
+      options.checkOnVisible,
+      options.isCurrent,
+      options.source,
+    ]
   )
 }
 

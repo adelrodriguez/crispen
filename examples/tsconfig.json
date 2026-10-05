@@ -5,6 +5,6 @@
     "noUncheckedSideEffectImports": false,
     "types": []
   },
-  "include": ["lab.tsx", "vite-react/src", "vite-react/vite.config.ts"],
+  "include": ["lab.tsx", "use-lab.ts", "vite-react/src", "vite-react/vite.config.ts"],
   "exclude": ["nextjs", "vite-react/builds", "vite-react/serve"]
 }

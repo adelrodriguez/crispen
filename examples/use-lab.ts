@@ -1,6 +1,6 @@
 import type { DeploymentMonitor, DeploymentStatus } from "crispen"
 import { getDefaultMonitor } from "crispen"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useSyncExternalStore } from "react"
 
 declare global {
   interface Window {
@@ -15,26 +15,32 @@ export interface LedgerEvent {
   readonly text: string
 }
 
-interface Ledger {
+interface Snapshot {
   readonly checkedAt: DeploymentStatus["checkedAt"]
   readonly error: DeploymentStatus["error"]
-  readonly events: readonly LedgerEvent[]
-  readonly nextId: number
   readonly status: DeploymentStatus["status"]
   readonly target: DeploymentStatus["target"]
 }
 
+interface Ledger {
+  readonly events: readonly LedgerEvent[]
+  readonly nextId: number
+  readonly snapshot: Snapshot | undefined
+}
+
+const EMPTY_LEDGER: Ledger = { events: [], nextId: 0, snapshot: undefined }
+
 /**
- * Record one ledger event each time the deployment state changes.
+ * Record one ledger event each time the deployment state changes. The server render and the
+ * hydration render show no events, because the event text contains the local time.
  */
 export function useEventLedger(deployment: DeploymentStatus): readonly LedgerEvent[] {
-  const [ledger, setLedger] = useState(() => recordEvent(undefined, deployment))
+  const isHydrated = useSyncExternalStore(subscribeToNothing, getClientSnapshot, getServerSnapshot)
+  const [ledger, setLedger] = useState(EMPTY_LEDGER)
 
   if (
-    ledger.checkedAt === deployment.checkedAt
-    && ledger.error === deployment.error
-    && ledger.status === deployment.status
-    && ledger.target === deployment.target
+    !isHydrated
+    || (ledger.snapshot !== undefined && isSameSnapshot(ledger.snapshot, deployment))
   ) {
     return ledger.events
   }
@@ -58,18 +64,45 @@ export function useLabSeam(): void {
   }, [])
 }
 
-function recordEvent(previous: Ledger | undefined, deployment: DeploymentStatus): Ledger {
-  const id = previous?.nextId ?? 0
+function recordEvent(previous: Ledger, deployment: DeploymentStatus): Ledger {
+  const id = previous.nextId
   const text = `${formatTime(new Date())} · ${deployment.status} · target ${deployment.target?.id ?? "—"}`
 
   return {
-    checkedAt: deployment.checkedAt,
-    error: deployment.error,
-    events: [{ id, text }, ...(previous?.events ?? [])].slice(0, LEDGER_SIZE),
+    events: [{ id, text }, ...previous.events].slice(0, LEDGER_SIZE),
     nextId: id + 1,
-    status: deployment.status,
-    target: deployment.target,
+    snapshot: {
+      checkedAt: deployment.checkedAt,
+      error: deployment.error,
+      status: deployment.status,
+      target: deployment.target,
+    },
   }
+}
+
+function isSameSnapshot(snapshot: Snapshot, deployment: DeploymentStatus): boolean {
+  return (
+    snapshot.checkedAt === deployment.checkedAt
+    && snapshot.error === deployment.error
+    && snapshot.status === deployment.status
+    && snapshot.target === deployment.target
+  )
+}
+
+function subscribeToNothing(): () => void {
+  return noop
+}
+
+function noop(): void {
+  // Hydration state never changes after the first client render.
+}
+
+function getClientSnapshot(): boolean {
+  return true
+}
+
+function getServerSnapshot(): boolean {
+  return false
 }
 
 export function formatTime(date: Date): string {
