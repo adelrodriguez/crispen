@@ -45,6 +45,7 @@
     "analyze": "adamantite analyze",
     "build": "tsdown",
     "build:examples": "node scripts/build-examples.ts",
+    "build:verify": "node scripts/verify-package-contract.ts",
     "bump:deps": "pnpm update --interactive",
     "check": "adamantite check",
     "dev": "tsdown --watch",
@@ -54,7 +55,6 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "test:exports": "node scripts/verify-package-contract.ts",
     "test:watch": "vitest",
     "version": "changeset version && adamantite fix --only format"
   },

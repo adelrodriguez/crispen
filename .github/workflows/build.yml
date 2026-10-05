@@ -40,5 +40,5 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Verify package contract
-        run: pnpm run test:exports
+      - name: Build and verify package contract
+        run: pnpm run build:verify
