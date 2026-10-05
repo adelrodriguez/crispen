@@ -1,14 +1,11 @@
 # Triage labels
 
-The skills use five canonical triage roles. This file maps those roles to the labels in
-this repository's issue tracker.
+The skills use five triage roles. Each role has a label with the same name in this repository.
 
-| Role              | Label             | Meaning                                     |
-| ----------------- | ----------------- | ------------------------------------------- |
-| `needs-triage`    | `needs-triage`    | A maintainer must evaluate the issue.       |
-| `needs-info`      | `needs-info`      | More information is required.               |
-| `ready-for-agent` | `ready-for-agent` | An agent can implement the specified work.  |
-| `ready-for-human` | `ready-for-human` | The work requires a human.                  |
-| `wontfix`         | `wontfix`         | The project will not implement the request. |
-
-Use the label in the second column when a skill refers to a triage role.
+| Label             | Meaning                                    |
+| ----------------- | ------------------------------------------ |
+| `needs-triage`    | A maintainer must evaluate the issue.      |
+| `needs-info`      | The issue needs more information.          |
+| `ready-for-agent` | An agent can implement the specified work. |
+| `ready-for-human` | The work needs a human.                    |
+| `wontfix`         | The project will not do the work.          |

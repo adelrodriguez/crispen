@@ -1,77 +1,61 @@
-# Crispen — Ubiquitous language
+# Crispen glossary
 
-Crispen detects and manages skew between a running frontend client and the
-currently deployed application.
+Crispen detects skew between a running browser client and the deployment that the client should use. Use these terms, with these meanings, in code, tests, issues, and docs.
 
-## Vocabulary registers
+## Word rules
 
-One term per register. Do not mix them.
+Each word below belongs to one kind of text. Use it only there.
 
-- **"skew"** — prose only. Problem statements, docs, README. Never in code.
-- **"current" / "stale"** — code only. API status values and identifiers.
-- **"fresh"** — brand only. Tagline and marketing copy. Never in code or specs.
+| Word                  | Use it in                                   | Do not use it in |
+| --------------------- | ------------------------------------------- | ---------------- |
+| "skew"                | Prose: problem statements, docs, README.    | Code.            |
+| "current" and "stale" | Code: status values and identifiers.        | Brand copy.      |
+| "fresh"               | Brand copy: the tagline and marketing text. | Code and specs.  |
 
-## Roles
+## Packages
 
-- **Adapter** — a build-tool or framework package (`crispen/vite`,
-  `crispen/next`, `crispen/astro`). An adapter embeds the running deployment
-  identity into the built application and serves the deployment descriptor.
-  Adapters were called "producer integrations" in early drafts.
-- **Integration** — a UI library package (`crispen/react`, `crispen/svelte`).
-  An integration exposes monitor state through the library's native primitives
-  (hooks, stores). Integrations were called "consumer adapters" in early
-  drafts.
-- **Core** — the `crispen` root export: the protocol plus the headless runtime.
+**Core.** The `crispen` root export. It holds the protocol and the headless runtime, and it has no runtime dependencies.
 
-Governing rule: adapters may use framework-specific mechanisms, but they must
-produce identical runtime semantics. Integrations must never depend on a
-particular adapter.
+**Adapter.** A build-tool or framework package: `crispen/vite` or `crispen/next`. An adapter writes the embed into the built app and makes the descriptor available. Adapters can use any mechanism of their framework, but every adapter must give the same runtime result. Do not call an adapter a "producer".
 
-## Domain terms
+**Integration.** A UI library package: `crispen/react`. An integration gives monitor state to the library through its own primitives, such as hooks. An integration never depends on one adapter. Do not call an integration a "consumer adapter".
 
-- **Deployment** — an identified build of the application. Shape:
-  `{ id: string, builtAt?: Date }`.
-- **Deployment ID strategy** — the adapter rule that selects the running
-  deployment ID. It accepts a literal string, a named platform, one or more
-  environment variables, or a resolver function. Without an explicit option,
-  adapters detect Vercel, Cloudflare Pages, Netlify, then GitHub Actions. They
-  read only the detected platform's commit ID, then fall back to `GIT_SHA` and
-  a random ID. An explicit strategy does not use these fallbacks. It warns and
-  uses a random ID when it cannot resolve a value.
-- **Running deployment** — the deployment that produced the JavaScript
-  currently executing in this client. Immutable for the life of the page.
-- **Target deployment** — the deployment this client should currently be
-  using. Deliberately not "latest": during canaries, tenant pinning, or staged
-  rollouts the newest global deployment may not be this client's target.
-- **`DeploymentSource`** — the protocol object connecting adapters to the
-  runtime: `{ running: Deployment, resolveTarget(signal): Promise<Deployment> }`.
-  `resolveTarget` must resolve independently of the running deployment.
-- **Descriptor** — the wire representation of the target deployment, served as
-  JSON at `/_crispen/deployment.json`. Versioned (`v: 1`). The descriptor is
-  the one surface that must never break: long-lived old clients read
-  descriptors emitted by future adapters.
-- **Embed** — the build-time injected global (`globalThis.__CRISPEN__`) that
-  carries the running deployment identity and adapter config (such as a custom
-  endpoint) into the browser. The embed is how the core learns the running
-  identity without knowing which adapter produced it.
-- **Monitor** (`DeploymentMonitor`) — the headless runtime. It schedules and
-  deduplicates checks, evaluates whether the running deployment is current,
-  holds state, and exposes `check()` and `reload()`. One shared monitor exists
-  per `DeploymentSource`; consumers subscribe to it, they do not own it. No
-  provider component exists.
-- **Check** — one resolution of the target plus one `isCurrent` evaluation. A
-  check never rejects; failures land in state as `error`.
-- **`isCurrent`** — an optional pure predicate `(running, target) => boolean`.
-  Exact deployment ID equality is the default.
-- **`DeploymentStatus`** — the state object consumers receive:
-  `status` (`"unknown" | "current" | "stale"`), `checkStatus` (`"checking" |
-"idle"`), `reloadStatus` (`"ready" | "blocked" | "unprotected"`), `error`,
-  `running`, `target`, `checkedAt`, `check()`, `reload()`. `status` is durable
-  knowledge; `checkStatus`, `reloadStatus`, and `error` are orthogonal axes and
-  never erase it.
-  When `status` is `"current"` or `"stale"`, `target` and `checkedAt` are
-  non-null.
-- **Reload guard** — sessionStorage-based protection inside `reload()` that
-  detects reloads which land back on the same running deployment and blocks
-  reload loops. `reloadStatus` is `"unprotected"` when session storage is
-  unavailable or a storage operation fails.
+**Package consumer.** An app that installs `crispen`.
+
+## Deployments
+
+**Deployment.** One identified build of the app: `{ id: string, builtAt?: Date }`.
+
+**Running deployment.** The deployment that produced the JavaScript in this tab. It never changes for the life of the page.
+
+**Target deployment.** The deployment that this tab should use now. Do not call it the "latest" deployment. During a canary release, tenant pinning, or a staged rollout, the newest global deployment can differ from this tab's target.
+
+**Deployment ID strategy.** The adapter rule that selects the running deployment ID: a literal string, a named platform, one or more environment variables, or a function. Without a strategy, the adapter detects the platform. See the [adapters reference](docs/reference/adapters.md#deployment-id).
+
+## Protocol
+
+**Descriptor.** The JSON file that holds the target deployment, at `/_crispen/deployment.json` by default. It has a version field (`v: 1`). The descriptor format must stay readable by old clients, because a tab that stays open for a week reads descriptors from newer adapters.
+
+**Embed.** The value that the adapter writes into the page as `globalThis.__CRISPEN__`. It holds the running deployment and the descriptor endpoint. The core reads the running deployment from the embed and does not know which adapter wrote it.
+
+**Endpoint.** The URL of the descriptor. A **local endpoint** is a path on the app origin, and the adapter writes the descriptor for it. An **external endpoint** is an absolute or protocol-relative URL, and another service serves the descriptor.
+
+**`DeploymentSource`.** The object that connects a source of deployments to the runtime: `{ running, resolveTarget(signal) }`. `resolveTarget` must reach a service that the running deployment does not control.
+
+## Runtime
+
+**Monitor** (`DeploymentMonitor`). The headless runtime. It schedules checks, runs them, holds the state, and has `check()` and `reload()`. Crispen keeps one shared monitor for each `DeploymentSource`. Components subscribe to a monitor. They do not own it, and no provider component exists.
+
+**Registry.** The module-level map from a `DeploymentSource` to its shared monitor. `getMonitor` and `getDefaultMonitor` read it.
+
+**Subscriber.** A listener on a monitor, with its own `DeploymentSubscriberOptions`. The monitor combines the options of all subscribers.
+
+**Check.** One resolution of the target and one `isCurrent` comparison. A check never rejects. A failure goes into `error`.
+
+**`isCurrent`.** An optional pure function `(running, target) => boolean`. Without it, the comparison is exact ID equality.
+
+**`DeploymentStatus`.** The state that subscribers receive. `status` (`"unknown"`, `"current"`, or `"stale"`) is durable: only a successful check changes it. `checkStatus`, `reloadStatus`, and `error` are separate fields, and a change to them never changes `status`. When `status` is `"current"` or `"stale"`, `target` and `checkedAt` are not `null`.
+
+**Reload guard.** The part of `reload()` that stops reload loops. It records each reload request in session storage and blocks a request after two reloads that land on the same running deployment. `reloadStatus` is `"unprotected"` when session storage is unavailable or throws.
+
+**Inert.** The state of a monitor with no source, for example in development. An inert monitor reports `"unknown"` and never checks.

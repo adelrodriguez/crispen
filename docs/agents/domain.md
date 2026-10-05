@@ -1,24 +1,9 @@
 # Domain docs
 
-This repository uses a single-context domain-doc layout.
+This repository has one domain context.
 
-## Before you explore
+Before you explore, read `GLOSSARY.md` at the repository root and the ADRs in `docs/adr/` that touch your area. Either can be missing. Domain-modeling skills create them when the project settles a term or a decision.
 
-Read these files when they exist:
+Use each glossary term with its glossary meaning, and keep one term for one concept. Obey the word rules at the top of the glossary: "skew" in prose, "current" and "stale" in code, "fresh" in brand copy.
 
-- `GLOSSARY.md` at the repository root.
-- Relevant ADRs in `docs/adr/`.
-
-If a file does not exist, continue without a warning. Domain-modeling skills create these
-files when the project resolves terms or decisions.
-
-## Vocabulary
-
-Use the terms from the `GLOSSARY.md` glossary. Do not replace defined terms with synonyms.
-Obey its vocabulary registers: "skew" in prose only, "current" and "stale" in code, and
-"fresh" in brand copy only.
-
-## ADR conflicts
-
-State when proposed work conflicts with an ADR. Do not silently replace an accepted
-decision.
+When proposed work conflicts with an ADR, say so before you change anything. Replace an accepted decision only with a new ADR.

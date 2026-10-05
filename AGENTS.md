@@ -2,20 +2,17 @@
 
 Use ASD-STE100 Simplified Technical English for all communication.
 
-Before you explore or change code, read `GLOSSARY.md` and `docs/agents/domain.md`. Use
-the project's domain language.
+Before you explore or change code, read `GLOSSARY.md` and `docs/agents/domain.md`. Use the glossary terms.
 
 ## Agent skills
 
 ### Source references
 
-When a skill requires a local dependency source checkout, use Packref. See the Packref
-section below.
+When a skill needs the source of a dependency, use Packref. See the Packref section below.
 
 ### Issue tracker
 
-Issues and PRDs are GitHub issues at `adelrodriguez/crispen`. See
-`docs/agents/issue-tracker.md`.
+Issues, PRDs, and plans are GitHub issues at `adelrodriguez/crispen`. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
@@ -27,35 +24,32 @@ Use the single-context domain-doc layout. See `docs/agents/domain.md`.
 
 ### Changesets
 
-Use Changesets for versioning and changelog management. See
-`docs/agents/changesets.md`.
+Before you commit a change that package consumers see, read `docs/agents/changesets.md`.
 
 ### Implementation plans
 
-Write an implementation plan into the GitHub issue that it serves. Update the issue body
-when the plan changes, so the issue stays the single record of the work. Do not add plan
-files to the repository. See `docs/agents/issue-tracker.md`.
+Write a plan in the body of the GitHub issue that it serves. Keep plan files out of the repository. See `docs/agents/issue-tracker.md`.
+
+## Documentation
+
+User docs live in `docs/`, one mode per folder: `how-to/` for tasks, `reference/` for the API, and `explanation/` for design. `README.md` is the landing page and links to every page. `CONTRIBUTING.md` covers local setup and the skew lab.
+
+- When you change public behavior, update the matching page in `docs/reference/` in the same commit.
+- When you change a design decision, update `docs/explanation/how-crispen-detects-a-stale-client.md`.
+- Check every fact in a doc against `src/`.
 
 ## Repository rules
 
 - Use Bun for package management and scripts.
-- Run `bun run test`, `bun run build`, `bun run check`, and `bun run format` after edits.
-- Run `bun run analyze` after dependency, import, or export changes.
-- Run `bun run test:exports` after export changes, and `bun run test:e2e` after runtime,
-  integration, or adapter changes.
-- Keep tests colocated in `src/**/__tests__/`. Only e2e scenarios (`e2e/`) and the package
-  contract (`tests/package-contract/`) live outside `src`.
-- Keep the protocol in `src/lib/protocol/`, the headless runtime in `src/lib/runtime/`, UI
-  library integrations in `src/integrations/<library>/`, and build-tool and framework
-  adapters in `src/adapters/<tool>/`.
-- Import only in one direction: `src/lib/protocol/` → `src/lib/runtime/` →
-  `src/integrations/`. Adapters import only from `src/lib/protocol/` and
-  `src/adapters/shared.ts`. An integration never imports an adapter.
-- Keep the core and integrations free of runtime dependencies. Framework packages are
-  optional peer dependencies.
-- Treat `crispen`, `crispen/react`, `crispen/vite`, and `crispen/next` as public entry
-  points. Consider package consumers before changing their runtime behavior or types.
-- Add or update tests for behavior changes.
+- After edits, run `bun run test`, `bun run build`, `bun run check`, and `bun run format`.
+- After dependency, import, or export changes, run `bun run analyze` and `bun run test:exports`.
+- After runtime, integration, or adapter changes, run `bun run test:e2e`.
+- Keep tests in a `__tests__/` folder next to the code under test. Only `e2e/` and `tests/package-contract/` live outside `src/`.
+- Keep the protocol in `src/lib/protocol/`, the headless runtime in `src/lib/runtime/`, integrations in `src/integrations/<library>/`, and adapters in `src/adapters/<tool>/`.
+- Import in one direction only: `src/lib/protocol/`, then `src/lib/runtime/`, then `src/integrations/`. Adapters import only from `src/lib/protocol/` and `src/adapters/shared.ts`. An integration never imports an adapter.
+- Keep the core and the integrations free of runtime dependencies. Framework packages are optional peer dependencies.
+- `crispen`, `crispen/react`, `crispen/vite`, and `crispen/next` are the public entry points. Before you change their runtime behavior or types, consider package consumers.
+- Add or update tests for each behavior change.
 
 <!-- ADAMANTITE:START -->
 

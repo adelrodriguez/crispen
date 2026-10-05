@@ -1,15 +1,9 @@
 # Changesets
 
-This repository uses Changesets for versioning and changelog management.
+Changesets writes the version and the changelog.
 
-## Agent rules
+Add a changeset when package consumers see the change: the public API, runtime behavior, a bug fix, or a runtime dependency. Changes to tests, CI, docs, the examples, and release tooling need no changeset, because the package ships only `dist/`.
 
-- Add a changeset for public API changes, bug fixes, runtime dependency changes, and
-  documentation shipped with the package.
-- Do not add a changeset for tests, CI, contributor documentation, release tooling, the
-  examples, or internal maintenance.
-- Use `bunx changeset` to create a changeset and commit the generated `.changeset/*.md`
-  file.
-- Never make a major version bump unless the user requests it.
-- Alert the user when a change is breaking. Before version 1.0.0, release a breaking
-  change as a minor bump.
+Create one with `bunx changeset`, and commit the `.changeset/*.md` file it writes. Write the summary for package consumers: what they can now do, or what changed for them.
+
+Choose `patch` or `minor`. Use `major` only when the user asks for it. Before 1.0.0, release a breaking change as `minor`, and tell the user that it breaks.
