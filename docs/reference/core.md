@@ -149,16 +149,17 @@ An `Error` with `name` set to `"TargetResolutionError"` and a `reason` of type `
 
 ## Types
 
-| Type                          | Description                                                                                               |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `Deployment`                  | `{ id: string; builtAt?: Date }`.                                                                         |
-| `IsDeploymentCurrent`         | `(running: Deployment, target: Deployment) => boolean`. Must be pure.                                     |
-| `CheckStatus`                 | `"checking" \| "idle"`.                                                                                   |
-| `ReloadStatus`                | `"blocked" \| "ready" \| "unprotected"`.                                                                  |
-| `TargetResolutionErrorReason` | `"network" \| "http-status" \| "not-json" \| "invalid-json" \| "unsupported-version" \| "invalid-shape"`. |
-| `DescriptorV1`                | The descriptor wire format. See the [descriptor reference](./descriptor.md).                              |
-| `CrispenEmbed`                | The embed format. See the [descriptor reference](./descriptor.md#embed).                                  |
-| `RuntimeEnvironment`          | Timers, `addEventListener`, `removeEventListener`, `isVisible`, `now`, `reload`, and `storage`.           |
-| `RuntimeEvent`                | `{ persisted?: boolean }`.                                                                                |
-| `RuntimeEventType`            | `"online" \| "pageshow" \| "visibilitychange"`.                                                           |
-| `RuntimeStorage`              | `getItem`, `setItem`, and `removeItem`, with the same signatures as Web Storage.                          |
+| Type                          | Description                                                                                                            |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `Deployment`                  | `{ id: string; builtAt?: Date }`.                                                                                      |
+| `IsDeploymentCurrent`         | `(running: Deployment, target: Deployment) => boolean`. Must be pure.                                                  |
+| `CheckStatus`                 | `"checking" \| "idle"`.                                                                                                |
+| `ReloadStatus`                | `"blocked" \| "ready" \| "unprotected"`.                                                                               |
+| `TargetResolutionErrorReason` | `"network" \| "http-status" \| "not-json" \| "invalid-json" \| "unsupported-version" \| "invalid-shape"`.              |
+| `DescriptorV1`                | The descriptor wire format. See the [descriptor reference](./descriptor.md).                                           |
+| `CrispenEmbed`                | The embed format. See the [descriptor reference](./descriptor.md#embed).                                               |
+| `RuntimeEnvironment`          | Timers that use `TimerHandle`, `addEventListener`, `removeEventListener`, `isVisible`, `now`, `reload`, and `storage`. |
+| `RuntimeEvent`                | `{ persisted?: boolean }`.                                                                                             |
+| `RuntimeEventType`            | `"online" \| "pageshow" \| "visibilitychange"`.                                                                        |
+| `RuntimeStorage`              | `getItem`, `setItem`, and `removeItem`, with the same signatures as Web Storage.                                       |
+| `TimerHandle`                 | `number \| ReturnType<typeof setTimeout>`. The value that the environment timers return and clear.                     |
