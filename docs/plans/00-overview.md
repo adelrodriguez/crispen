@@ -1,7 +1,7 @@
 # Plan 00 — Overview and roadmap
 
 This directory holds the remaining implementation plans for Crispen. Read
-`CONTEXT.md` at the repo root first; the plans use its ubiquitous language
+`GLOSSARY.md` at the repo root first; the plans use its ubiquitous language
 strictly (adapter = build/framework side, integration = UI library side).
 
 ## Goal
@@ -50,7 +50,7 @@ re-litigate them inside a plan.
    hidden.
 8. **Dev mode is inert.** Without a real deployment (dev server, tests, no
    embed), the monitor reports `unknown`/`current` and never flags stale.
-9. **Terminology** per `CONTEXT.md`: no "freshness" or "producer/consumer" in
+9. **Terminology** per `GLOSSARY.md`: no "freshness" or "producer/consumer" in
    code or plans.
 
 ## Package layout (target state)
