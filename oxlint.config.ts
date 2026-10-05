@@ -28,9 +28,11 @@ export default defineConfig({
       plugins: vitest.plugins,
       rules: {
         ...vitest.rules,
-        // The vitest preset enables both this rule and `prefer-importing-vitest-globals`,
-        // which contradict each other. Tests import their globals from "vitest".
+        // The vitest preset enables pairs of rules that contradict each other.
+        // Keep one rule of each pair. See adelrodriguez/adamantite#496.
         "vitest/no-importing-vitest-globals": "off",
+        "vitest/prefer-called-times": "off",
+        "vitest/prefer-describe-function-title": "off",
       },
     },
   ],

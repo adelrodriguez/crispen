@@ -48,6 +48,6 @@ describe("deployment embed", () => {
 
     expect(readEmbed()).toBeUndefined()
     expect(warningIssued).toBe(true)
-    expect(warning).toHaveBeenCalledExactlyOnceWith(expect.any(String))
+    expect(warning).toHaveBeenCalledOnce()
   })
 })

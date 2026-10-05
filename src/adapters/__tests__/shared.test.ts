@@ -46,7 +46,7 @@ function isolateDeploymentEnvironment(): MockInstance<typeof console.warn> {
   return warn
 }
 
-describe("external endpoint detection", () => {
+describe("checkIsExternalEndpoint", () => {
   it.each([
     "https://control.example/deployment.json",
     "HTTP://control.example/deployment.json",
@@ -71,7 +71,7 @@ describe("external endpoint detection", () => {
   })
 })
 
-describe("deployment ID resolution", () => {
+describe("resolveDeploymentId", () => {
   it("uses an explicit string over every strategy", () => {
     expect.assertions(1)
     isolateDeploymentEnvironment()
