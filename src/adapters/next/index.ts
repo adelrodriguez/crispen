@@ -76,7 +76,7 @@ export function withCrispen(
   options: CrispenNextOptions = {}
 ): NextConfigFunction {
   return async (phase, context) => {
-    const resolvedConfig = typeof config === "function" ? await config(phase, context) : config
+    const resolvedConfig = checkIsConfigFunction(config) ? await config(phase, context) : config
     const configuredEndpoint = options.endpoint ?? DEFAULT_DESCRIPTOR_ENDPOINT
     const basePath = resolvedConfig.basePath ?? ""
     const endpoint = resolvePublicEndpoint(basePath, configuredEndpoint)
@@ -113,6 +113,10 @@ export function withCrispen(
   }
 }
 
+function checkIsConfigFunction(config: NextConfigExport): config is NextConfigFunction {
+  return typeof config === "function"
+}
+
 function createDescriptorHeader(
   endpoint: string,
   hasBasePath: boolean
@@ -121,9 +125,11 @@ function createDescriptorHeader(
     return undefined
   }
 
-  return {
-    ...(hasBasePath ? { basePath: false as const } : {}),
-    headers: [{ key: "Cache-Control", value: "no-store" }],
-    source: endpoint,
+  const headers = [{ key: "Cache-Control", value: "no-store" }]
+
+  if (hasBasePath) {
+    return { basePath: false, headers, source: endpoint }
   }
+
+  return { headers, source: endpoint }
 }

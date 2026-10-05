@@ -1,10 +1,13 @@
-import { describe, expect, it } from "bun:test"
 import type { NextApiRequest, NextApiResponse, NextConfig } from "next"
-import { mkdtemp, mkdir, rm, symlink } from "node:fs/promises"
+import { spawn } from "node:child_process"
+import { once } from "node:events"
+import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises"
 import { createServer } from "node:net"
 import { join } from "node:path"
+import { setTimeout as sleep } from "node:timers/promises"
 import { PHASE_DEVELOPMENT_SERVER, PHASE_PRODUCTION_BUILD } from "next/constants.js"
 import { isValidElement } from "react"
+import { describe, expect, it, onTestFinished } from "vitest"
 import { parseDescriptor } from "../../../lib/protocol/descriptor"
 import { CrispenScript, crispenPagesHandler, GET, withCrispen } from "../index"
 
@@ -19,8 +22,50 @@ async function resolveNextConfig(
   return config(phase, { defaultConfig: {} })
 }
 
-describe("Next adapter", () => {
+/**
+ * Sets environment variables for the current test and restores the previous values when the test
+ * finishes.
+ */
+function setEnvironment(values: Readonly<Record<string, string | undefined>>): void {
+  const previousEnvironment = new Map<string, string | undefined>()
+  for (const [key, value] of Object.entries(values)) {
+    previousEnvironment.set(key, process.env[key])
+    process.env[key] = value
+  }
+
+  onTestFinished(() => {
+    restoreEnvironment(previousEnvironment)
+  })
+}
+
+function applyConfigEnvironment(config: NextConfig): void {
+  setEnvironment(config.env ?? {})
+}
+
+function readEmbedJson(config: NextConfig): string {
+  return config.env?.CRISPEN_NEXT_EMBED ?? "{}"
+}
+
+async function readHeaders(
+  config: NextConfig
+): Promise<Awaited<ReturnType<NonNullable<NextConfig["headers"]>>> | undefined> {
+  return config.headers?.()
+}
+
+function readScriptHtml(script: ReturnType<typeof CrispenScript>): string {
+  if (
+    !isValidElement<{
+      readonly dangerouslySetInnerHTML: { readonly __html: string }
+    }>(script)
+  ) {
+    throw new Error("Expected CrispenScript to return a script element")
+  }
+  return script.props.dangerouslySetInnerHTML.__html
+}
+
+describe("next adapter", () => {
   it("adds Crispen config without replacing user config functions or values", async () => {
+    expect.assertions(5)
     const config: NextConfig = {
       env: { USER_VALUE: "preserved" },
       generateBuildId: generateUserBuildId,
@@ -35,13 +80,13 @@ describe("Next adapter", () => {
     }
 
     const wrapped = await resolveNextConfig(withCrispen(config, { deploymentId: "A" }))
-    const headers = await wrapped.headers?.()
+    const headers = await readHeaders(wrapped)
 
     expect(wrapped.deploymentId).toBeUndefined()
     expect(wrapped.generateBuildId).toBe(generateUserBuildId)
     expect(wrapped.env?.USER_VALUE).toBe("preserved")
     expect(wrapped.reactStrictMode).toBe(true)
-    expect(headers).toEqual([
+    expect(headers).toStrictEqual([
       {
         headers: [{ key: "x-user", value: "preserved" }],
         source: "/user",
@@ -54,6 +99,7 @@ describe("Next adapter", () => {
   })
 
   it("composes with an async phase-aware user config", async () => {
+    expect.assertions(5)
     const defaultConfig: NextConfig = { poweredByHeader: false }
     const userConfig = async (phase: string, context: { defaultConfig: NextConfig }) => {
       await Promise.resolve()
@@ -75,52 +121,35 @@ describe("Next adapter", () => {
   })
 
   it("does not override the Next deployment id used by Skew Protection", async () => {
-    const previousDeploymentId = process.env.NEXT_DEPLOYMENT_ID
-    process.env.NEXT_DEPLOYMENT_ID = "vercel-deployment"
+    expect.assertions(1)
+    setEnvironment({ NEXT_DEPLOYMENT_ID: "vercel-deployment" })
 
-    try {
-      const wrapped = await resolveNextConfig(
-        withCrispen({}, { deploymentId: "crispen-deployment" })
-      )
+    const wrapped = await resolveNextConfig(withCrispen({}, { deploymentId: "crispen-deployment" }))
 
-      expect(wrapped.deploymentId).toBeUndefined()
-    } finally {
-      if (previousDeploymentId === undefined) {
-        Reflect.deleteProperty(process.env, "NEXT_DEPLOYMENT_ID")
-      } else {
-        process.env.NEXT_DEPLOYMENT_ID = previousDeploymentId
-      }
-    }
+    expect(wrapped.deploymentId).toBeUndefined()
   })
 
   it("resolves a deployment id strategy through the adapter options", async () => {
-    const previousCommitRef = process.env.COMMIT_REF
-    process.env.COMMIT_REF = "netlify-sha"
+    expect.assertions(1)
+    setEnvironment({ COMMIT_REF: "netlify-sha" })
 
-    try {
-      const wrapped = await resolveNextConfig(
-        withCrispen({}, { deploymentId: { platform: "netlify" } })
-      )
+    const wrapped = await resolveNextConfig(
+      withCrispen({}, { deploymentId: { platform: "netlify" } })
+    )
 
-      expect(wrapped.env?.CRISPEN_NEXT_EMBED).toContain('"id":"netlify-sha"')
-    } finally {
-      if (previousCommitRef === undefined) {
-        Reflect.deleteProperty(process.env, "COMMIT_REF")
-      } else {
-        process.env.COMMIT_REF = previousCommitRef
-      }
-    }
+    expect(wrapped.env?.CRISPEN_NEXT_EMBED).toContain('"id":"netlify-sha"')
   })
 
   it("prefixes the default endpoint with the Next base path", async () => {
+    expect.assertions(2)
     const wrapped = await resolveNextConfig(
       withCrispen({ basePath: "/app" }, { deploymentId: "A" })
     )
 
-    expect(JSON.parse(wrapped.env?.CRISPEN_NEXT_EMBED ?? "{}")).toMatchObject({
+    expect(JSON.parse(readEmbedJson(wrapped))).toMatchObject({
       endpoint: "/app/_crispen/deployment.json",
     })
-    expect(await wrapped.headers?.()).toContainEqual({
+    await expect(readHeaders(wrapped)).resolves.toContainEqual({
       basePath: false,
       headers: [{ key: "Cache-Control", value: "no-store" }],
       source: "/app/_crispen/deployment.json",
@@ -128,14 +157,15 @@ describe("Next adapter", () => {
   })
 
   it("resolves an explicit local endpoint under the Next base path", async () => {
+    expect.assertions(2)
     const wrapped = await resolveNextConfig(
       withCrispen({ basePath: "/app" }, { deploymentId: "A", endpoint: "/descriptor.json" })
     )
 
-    expect(JSON.parse(wrapped.env?.CRISPEN_NEXT_EMBED ?? "{}")).toMatchObject({
+    expect(JSON.parse(readEmbedJson(wrapped))).toMatchObject({
       endpoint: "/app/descriptor.json",
     })
-    expect(await wrapped.headers?.()).toContainEqual({
+    await expect(readHeaders(wrapped)).resolves.toContainEqual({
       basePath: false,
       headers: [{ key: "Cache-Control", value: "no-store" }],
       source: "/app/descriptor.json",
@@ -143,9 +173,10 @@ describe("Next adapter", () => {
   })
 
   it("does not add a base-path override for an empty base path", async () => {
+    expect.assertions(1)
     const wrapped = await resolveNextConfig(withCrispen({ basePath: "" }, { deploymentId: "A" }))
 
-    expect(await wrapped.headers?.()).toEqual([
+    await expect(readHeaders(wrapped)).resolves.toStrictEqual([
       {
         headers: [{ key: "Cache-Control", value: "no-store" }],
         source: "/_crispen/deployment.json",
@@ -154,6 +185,7 @@ describe("Next adapter", () => {
   })
 
   it("keeps an external endpoint unchanged under a Next base path", async () => {
+    expect.assertions(2)
     const wrapped = await resolveNextConfig(
       withCrispen(
         { basePath: "/app" },
@@ -161,57 +193,34 @@ describe("Next adapter", () => {
       )
     )
 
-    expect(JSON.parse(wrapped.env?.CRISPEN_NEXT_EMBED ?? "{}")).toMatchObject({
+    expect(JSON.parse(readEmbedJson(wrapped))).toMatchObject({
       endpoint: "https://control.example/descriptor.json",
     })
-    expect(await wrapped.headers?.()).toBeUndefined()
+    await expect(readHeaders(wrapped)).resolves.toBeUndefined()
   })
 
   it("renders the embed and serves the matching no-store descriptor", async () => {
+    expect.assertions(4)
     const config = await resolveNextConfig(withCrispen({}, { deploymentId: "A" }))
-    const previousEnvironment = new Map<string, string | undefined>()
-    for (const [key, value] of Object.entries(config.env ?? {})) {
-      previousEnvironment.set(key, process.env[key])
-      process.env[key] = value
-    }
+    applyConfigEnvironment(config)
 
-    try {
-      const script = CrispenScript()
-      const response = GET()
+    const html = readScriptHtml(CrispenScript())
+    const response = GET()
 
-      if (
-        !isValidElement<{
-          readonly dangerouslySetInnerHTML: { readonly __html: string }
-        }>(script)
-      ) {
-        throw new Error("Expected CrispenScript to return a script element")
-      }
-      const html = script.props.dangerouslySetInnerHTML.__html
-      expect(html).toContain("globalThis.__CRISPEN__")
-      expect(html).toContain('"id":"A"')
-      expect(response.headers.get("Cache-Control")).toBe("no-store")
-      expect(await response.json()).toMatchObject({ id: "A", v: 1 })
-    } finally {
-      for (const [key, value] of previousEnvironment) {
-        if (value === undefined) {
-          Reflect.deleteProperty(process.env, key)
-        } else {
-          process.env[key] = value
-        }
-      }
-    }
+    expect(html).toContain("globalThis.__CRISPEN__")
+    expect(html).toContain('"id":"A"')
+    expect(response.headers.get("Cache-Control")).toBe("no-store")
+    await expect(response.json()).resolves.toMatchObject({ id: "A", v: 1 })
   })
 
   it("serves the descriptor through the Pages Router handler", async () => {
+    expect.assertions(3)
     const config = await resolveNextConfig(withCrispen({}, { deploymentId: "A" }))
-    const previousEnvironment = new Map<string, string | undefined>()
-    for (const [key, value] of Object.entries(config.env ?? {})) {
-      previousEnvironment.set(key, process.env[key])
-      process.env[key] = value
-    }
+    applyConfigEnvironment(config)
     const headers = new Map<string, string>()
     let body = ""
     let status = 0
+    // SAFETY: crispenPagesHandler only calls setHeader, status, and end on the response.
     const response = {
       end(value: string) {
         body = value
@@ -223,20 +232,19 @@ describe("Next adapter", () => {
         status = value
         return this
       },
-    } as unknown as NextApiResponse
+    } as NextApiResponse
+    // SAFETY: crispenPagesHandler does not read the request.
+    const request = {} as NextApiRequest
 
-    try {
-      crispenPagesHandler({} as NextApiRequest, response)
+    crispenPagesHandler(request, response)
 
-      expect(status).toBe(200)
-      expect(headers.get("Cache-Control")).toBe("no-store")
-      expect(JSON.parse(body)).toMatchObject({ id: "A", v: 1 })
-    } finally {
-      restoreEnvironment(previousEnvironment)
-    }
+    expect(status).toBe(200)
+    expect(headers.get("Cache-Control")).toBe("no-store")
+    expect(JSON.parse(body)).toMatchObject({ id: "A", v: 1 })
   })
 
   it("leaves the embed and descriptor inert for the Next development phase", async () => {
+    expect.assertions(1)
     const config = await resolveNextConfig(
       withCrispen({}, { deploymentId: "A" }),
       PHASE_DEVELOPMENT_SERVER
@@ -249,7 +257,8 @@ describe("Next adapter", () => {
   })
 
   it("embeds and serves a descriptor from a real Next build", async () => {
-    await run(["bun", "run", "build"], process.cwd())
+    expect.assertions(5)
+    await run(["pnpm", "run", "build"], process.cwd())
     const root = await mkdtemp(join(process.cwd(), ".next-adapter-test-"))
 
     try {
@@ -258,23 +267,23 @@ describe("Next adapter", () => {
       })
       await mkdir(join(root, "node_modules"), { recursive: true })
       await Promise.all([
-        Bun.write(
+        writeFile(
           join(root, "package.json"),
           '{"name":"next-adapter-fixture","private":true,"type":"module"}'
         ),
-        Bun.write(
+        writeFile(
           join(root, "next.config.mjs"),
           'import { withCrispen } from "crispen/next"\nexport default withCrispen({ basePath: "/app" }, { deploymentId: "A" })\n'
         ),
-        Bun.write(
+        writeFile(
           join(root, "app/layout.tsx"),
           'import { CrispenScript } from "crispen/next"\nexport default function Layout({ children }: { children: React.ReactNode }) { return <html><body><CrispenScript />{children}</body></html> }\n'
         ),
-        Bun.write(
+        writeFile(
           join(root, "app/page.tsx"),
           "export default function Page() { return <main>Fixture</main> }\n"
         ),
-        Bun.write(
+        writeFile(
           join(root, "app/%5Fcrispen/deployment.json/route.ts"),
           'export { GET } from "crispen/next"\nexport const dynamic = "force-static"\n'
         ),
@@ -289,10 +298,12 @@ describe("Next adapter", () => {
 
       await run([join(process.cwd(), "node_modules/.bin/next"), "build", "--turbopack"], root)
       const port = await findAvailablePort()
-      const server = Bun.spawn(
-        [join(process.cwd(), "node_modules/.bin/next"), "start", "--port", String(port)],
-        { cwd: root, stderr: "pipe", stdout: "pipe" }
+      const server = spawn(
+        join(process.cwd(), "node_modules/.bin/next"),
+        ["start", "--port", String(port)],
+        { cwd: root, stdio: "ignore" }
       )
+      const serverExit = once(server, "exit")
 
       try {
         await waitForServer(port)
@@ -312,7 +323,7 @@ describe("Next adapter", () => {
         expect(parseDescriptor(descriptor).id).toBe("A")
       } finally {
         server.kill()
-        await server.exited
+        await serverExit
       }
     } finally {
       await rm(root, { force: true, recursive: true })
@@ -346,20 +357,25 @@ async function findAvailablePort(): Promise<number> {
     })
   })
 
-  if (typeof address === "string" || address === null) {
+  if (address === null || !(address instanceof Object)) {
     throw new Error("Could not allocate a test port")
   }
   return address.port
 }
 
-async function run(command: string[], cwd: string): Promise<void> {
-  const child = Bun.spawn(command, { cwd, stderr: "pipe", stdout: "pipe" })
-  const [exitCode, stdout, stderr] = await Promise.all([
-    child.exited,
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-  ])
+async function run([executable, ...arguments_]: [string, ...string[]], cwd: string): Promise<void> {
+  const child = spawn(executable, arguments_, { cwd })
+  let stdout = ""
+  let stderr = ""
+  child.stdout.setEncoding("utf8").on("data", (chunk: string) => {
+    stdout += chunk
+  })
+  child.stderr.setEncoding("utf8").on("data", (chunk: string) => {
+    stderr += chunk
+  })
+  const [exitCode] = await once(child, "close")
   if (exitCode !== 0) {
+    const command = [executable, ...arguments_]
     throw new Error(`${command.join(" ")} failed\n${stdout}\n${stderr}`)
   }
 }
@@ -378,6 +394,6 @@ async function waitForServer(port: number, attempts = 100): Promise<void> {
     throw new Error("Next test server did not start")
   }
 
-  await Bun.sleep(100)
+  await sleep(100)
   return waitForServer(port, attempts - 1)
 }

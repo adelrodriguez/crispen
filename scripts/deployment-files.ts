@@ -19,7 +19,7 @@ export async function activateBuild(exampleRoot: string, buildDirectory: string)
   }
 }
 
-function isReplaceError(error: unknown): boolean {
+function isReplaceError(error: unknown): error is NodeJS.ErrnoException {
   if (!(error instanceof Error) || !("code" in error)) {
     return false
   }

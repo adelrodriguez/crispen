@@ -3,6 +3,7 @@ import type {
   RuntimeEvent,
   RuntimeEventType,
   RuntimeStorage,
+  TimerHandle,
 } from "../src/lib/runtime/environment"
 
 export class MemoryStorage implements RuntimeStorage {
@@ -22,9 +23,9 @@ export class MemoryStorage implements RuntimeStorage {
 }
 
 export class FakeEnvironment implements RuntimeEnvironment {
-  readonly #intervals = new Map<number, { callback: () => void; delay: number }>()
+  readonly #intervals = new Map<TimerHandle, { callback: () => void; delay: number }>()
   readonly #listeners = new Map<RuntimeEventType, Set<(event: RuntimeEvent) => void>>()
-  readonly #timeouts = new Map<number, { callback: () => void; delay: number }>()
+  readonly #timeouts = new Map<TimerHandle, { callback: () => void; delay: number }>()
   #nextInterval = 1
   #nextTimeout = 1
   #now = 0
@@ -43,12 +44,12 @@ export class FakeEnvironment implements RuntimeEnvironment {
     this.#listeners.set(type, listeners)
   }
 
-  clearInterval(handle: unknown): void {
-    this.#intervals.delete(handle as number)
+  clearInterval(handle: TimerHandle): void {
+    this.#intervals.delete(handle)
   }
 
-  clearTimeout(handle: unknown): void {
-    this.#timeouts.delete(handle as number)
+  clearTimeout(handle: TimerHandle): void {
+    this.#timeouts.delete(handle)
   }
 
   fire(type: RuntimeEventType, event: RuntimeEvent = {}): void {
@@ -95,7 +96,7 @@ export class FakeEnvironment implements RuntimeEnvironment {
     this.#listeners.get(type)?.delete(listener)
   }
 
-  setInterval(callback: () => void, delay: number): unknown {
+  setInterval(callback: () => void, delay: number): TimerHandle {
     this.intervalStarts += 1
     const handle = this.#nextInterval
     this.#nextInterval += 1
@@ -103,7 +104,7 @@ export class FakeEnvironment implements RuntimeEnvironment {
     return handle
   }
 
-  setTimeout(callback: () => void, delay: number): unknown {
+  setTimeout(callback: () => void, delay: number): TimerHandle {
     const handle = this.#nextTimeout
     this.#nextTimeout += 1
     this.#timeouts.set(handle, { callback, delay })

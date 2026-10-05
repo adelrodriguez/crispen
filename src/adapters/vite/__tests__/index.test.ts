@@ -1,12 +1,11 @@
-import { afterEach, describe, expect, it } from "bun:test"
-import { access, mkdtemp, readFile, rm } from "node:fs/promises"
+import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { build, createServer } from "vite"
+import { describe, expect, it, onTestFinished } from "vitest"
 import { parseDescriptor } from "../../../lib/protocol/descriptor"
 import { crispen } from "../index"
 
-const temporaryDirectories: string[] = []
 const deploymentEnvironmentVariables = [
   "CF_PAGES",
   "CF_PAGES_COMMIT_SHA",
@@ -18,33 +17,38 @@ const deploymentEnvironmentVariables = [
   "VERCEL",
   "VERCEL_GIT_COMMIT_SHA",
 ] as const
-const originalEnvironment = new Map(
-  deploymentEnvironmentVariables.map((key) => [key, process.env[key]])
-)
 
-afterEach(async () => {
-  await Promise.all(
-    temporaryDirectories
-      .splice(0)
-      .map((directory) => rm(directory, { force: true, recursive: true }))
+/**
+ * Clears the deployment environment variables for the current test and restores them when the test
+ * finishes.
+ */
+function isolateDeploymentEnvironment(): void {
+  const previousEnvironment = new Map(
+    deploymentEnvironmentVariables.map((key) => [key, process.env[key]])
   )
-  for (const [key, value] of originalEnvironment) {
-    if (value === undefined) {
-      Reflect.deleteProperty(process.env, key)
-    } else {
-      process.env[key] = value
-    }
+  for (const key of deploymentEnvironmentVariables) {
+    Reflect.deleteProperty(process.env, key)
   }
-})
+
+  onTestFinished(() => {
+    for (const [key, value] of previousEnvironment) {
+      if (value === undefined) {
+        Reflect.deleteProperty(process.env, key)
+      } else {
+        process.env[key] = value
+      }
+    }
+  })
+}
 
 async function createFixture(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "crispen-vite-"))
-  temporaryDirectories.push(root)
-  await Bun.write(
+  onTestFinished(() => rm(root, { force: true, recursive: true }))
+  await writeFile(
     join(root, "index.html"),
     '<!doctype html><html><head><title>Fixture</title></head><body><script type="module" src="/main.js"></script></body></html>'
   )
-  await Bun.write(join(root, "main.js"), 'document.body.dataset.loaded = "true"')
+  await writeFile(join(root, "main.js"), 'document.body.dataset.loaded = "true"')
   return root
 }
 
@@ -68,8 +72,9 @@ async function buildFixture(
   }
 }
 
-describe("Vite adapter", () => {
+describe("vite adapter", () => {
   it("embeds the running deployment and emits its descriptor", async () => {
+    expect.assertions(2)
     const { descriptor, html } = await buildFixture({ deploymentId: "A" })
 
     expect(html).toContain('<script>globalThis.__CRISPEN__={"v":1,"running":{"id":"A"')
@@ -77,9 +82,8 @@ describe("Vite adapter", () => {
   })
 
   it("prefers an explicit id, then the detected platform, GIT_SHA, and a random ID", async () => {
-    for (const key of deploymentEnvironmentVariables) {
-      Reflect.deleteProperty(process.env, key)
-    }
+    expect.assertions(4)
+    isolateDeploymentEnvironment()
     process.env.GIT_SHA = "git"
     process.env.GITHUB_SHA = "stray"
     process.env.VERCEL = "1"
@@ -103,9 +107,8 @@ describe("Vite adapter", () => {
   })
 
   it("resolves a deployment id strategy through the plugin options", async () => {
-    for (const key of deploymentEnvironmentVariables) {
-      Reflect.deleteProperty(process.env, key)
-    }
+    expect.assertions(2)
+    isolateDeploymentEnvironment()
     process.env.COMMIT_REF = "netlify-sha"
 
     const platform = await buildFixture({ deploymentId: { platform: "netlify" } })
@@ -116,6 +119,7 @@ describe("Vite adapter", () => {
   })
 
   it("escapes the embed for an HTML script context", async () => {
+    expect.assertions(2)
     const { html } = await buildFixture({
       deploymentId: "</script>\u2028\u2029",
     })
@@ -125,6 +129,7 @@ describe("Vite adapter", () => {
   })
 
   it("points to an external endpoint without emitting a local descriptor", async () => {
+    expect.assertions(2)
     const root = await createFixture()
     await build({
       logLevel: "silent",
@@ -139,16 +144,11 @@ describe("Vite adapter", () => {
     const html = await readFile(join(root, "dist/index.html"), "utf8")
 
     expect(html).toContain("https://control.example/deployment.json")
-    let descriptorExists = true
-    try {
-      await access(join(root, "dist/_crispen/deployment.json"))
-    } catch {
-      descriptorExists = false
-    }
-    expect(descriptorExists).toBe(false)
+    await expect(access(join(root, "dist/_crispen/deployment.json"))).rejects.toThrow("ENOENT")
   })
 
   it("prefixes the default endpoint with the Vite base", async () => {
+    expect.assertions(2)
     const { descriptor, html } = await buildFixture({ deploymentId: "A" }, "/app/")
 
     expect(html).toContain('"endpoint":"/app/_crispen/deployment.json"')
@@ -156,6 +156,7 @@ describe("Vite adapter", () => {
   })
 
   it("resolves an explicit local endpoint under the Vite base", async () => {
+    expect.assertions(2)
     const { descriptor, html } = await buildFixture(
       { deploymentId: "A", endpoint: "/descriptor.json" },
       "/app/"
@@ -166,6 +167,7 @@ describe("Vite adapter", () => {
   })
 
   it("keeps the default endpoint root-absolute for a relative Vite base", async () => {
+    expect.assertions(2)
     const { descriptor, html } = await buildFixture({ deploymentId: "A" }, "./")
 
     expect(html).toContain('"endpoint":"/_crispen/deployment.json"')
@@ -173,6 +175,7 @@ describe("Vite adapter", () => {
   })
 
   it("keeps the default endpoint on the application origin for a URL Vite base", async () => {
+    expect.assertions(2)
     const { descriptor, html } = await buildFixture(
       { deploymentId: "A" },
       "https://cdn.example/app/"
@@ -183,6 +186,7 @@ describe("Vite adapter", () => {
   })
 
   it("does not inject an embed during Vite development", async () => {
+    expect.assertions(1)
     const root = await createFixture()
     const server = await createServer({
       logLevel: "silent",

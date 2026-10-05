@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test"
+import { describe, expect, it } from "vitest"
 import type { DeploymentSource } from "../../index"
 import {
   createDeploymentMonitor,
@@ -12,6 +12,8 @@ import {
 
 describe("protocol public API", () => {
   it("supports a hand-written deployment source", async () => {
+    expect.assertions(1)
+
     const source: DeploymentSource = {
       resolveTarget() {
         return Promise.resolve({ id: "target" })
@@ -19,21 +21,25 @@ describe("protocol public API", () => {
       running: { id: "running" },
     }
 
-    const target = await source.resolveTarget(new AbortController().signal)
-
-    expect(target).toEqual({ id: "target" })
+    await expect(source.resolveTarget(new AbortController().signal)).resolves.toStrictEqual({
+      id: "target",
+    })
   })
 
   it("uses one public error class for descriptor and target resolution failures", () => {
+    expect.assertions(1)
     expect(() => parseDescriptor("not JSON")).toThrow(TargetResolutionError)
   })
 
-  it("exports the descriptor and source functions", () => {
-    expect(typeof createDeploymentMonitor).toBe("function")
-    expect(typeof createHttpSource).toBe("function")
-    expect(typeof createStaticSource).toBe("function")
-    expect(typeof getDefaultMonitor).toBe("function")
-    expect(typeof parseDescriptor).toBe("function")
-    expect(typeof serializeDescriptor).toBe("function")
+  it.each([
+    ["createDeploymentMonitor", createDeploymentMonitor],
+    ["createHttpSource", createHttpSource],
+    ["createStaticSource", createStaticSource],
+    ["getDefaultMonitor", getDefaultMonitor],
+    ["parseDescriptor", parseDescriptor],
+    ["serializeDescriptor", serializeDescriptor],
+  ])("exports the %s function", (_name, exported) => {
+    expect.assertions(1)
+    expect(exported).toBeTypeOf("function")
   })
 })

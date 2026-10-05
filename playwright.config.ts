@@ -22,13 +22,13 @@ export default defineConfig({
   webServer: [
     {
       command:
-        "bun scripts/static-server.ts --root examples/vite-react/serve --port 4173 --spa-fallback",
+        "node scripts/static-server.ts --root examples/vite-react/serve --port 4173 --spa-fallback",
       reuseExistingServer: false,
       url: "http://127.0.0.1:4173/__health",
     },
     {
       command:
-        "bun scripts/static-server.ts --root examples/nextjs/serve --port 4174 --spa-fallback",
+        "node scripts/static-server.ts --root examples/nextjs/serve --port 4174 --spa-fallback",
       reuseExistingServer: false,
       url: "http://127.0.0.1:4174/__health",
     },

@@ -30,26 +30,45 @@ export function readEmbed(): CrispenEmbed | undefined {
   return embed
 }
 
+interface EmbedCandidate {
+  readonly endpoint?: unknown
+  readonly running?: unknown
+  readonly v?: unknown
+}
+
+interface RunningCandidate {
+  readonly builtAt?: unknown
+  readonly id?: unknown
+}
+
 function checkIsEmbed(value: unknown): value is CrispenEmbed {
-  if (typeof value !== "object" || value === null) {
+  if (!checkIsEmbedCandidate(value)) {
     return false
   }
 
-  const { v, running, endpoint } = value as Record<string, unknown>
+  const { v, running, endpoint } = value
 
   if (v !== 1 || (endpoint !== undefined && typeof endpoint !== "string")) {
     return false
   }
 
-  if (typeof running !== "object" || running === null) {
+  if (!checkIsRunningCandidate(running)) {
     return false
   }
 
-  const { id, builtAt } = running as Record<string, unknown>
+  const { id, builtAt } = running
 
   return (
-    typeof id === "string" &&
-    id.length > 0 &&
-    (builtAt === undefined || typeof builtAt === "string")
+    typeof id === "string"
+    && id.length > 0
+    && (builtAt === undefined || typeof builtAt === "string")
   )
+}
+
+function checkIsEmbedCandidate(value: unknown): value is EmbedCandidate {
+  return typeof value === "object" && value !== null
+}
+
+function checkIsRunningCandidate(value: unknown): value is RunningCandidate {
+  return typeof value === "object" && value !== null
 }

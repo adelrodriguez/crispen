@@ -1,7 +1,7 @@
 import { resolve } from "node:path"
-import type { ExampleName } from "./example-build"
-import { activateBuild } from "./deployment-files"
-import { buildExample, buildPackage } from "./example-build"
+import type { ExampleName } from "./example-build.ts"
+import { activateBuild } from "./deployment-files.ts"
+import { buildExample, buildPackage } from "./example-build.ts"
 
 const example = readExample(process.argv[2])
 const id = crypto.randomUUID().replaceAll("-", "").slice(0, 12)

@@ -16,13 +16,10 @@ export function createEmbeddedSource(): DeploymentSource | undefined {
     return undefined
   }
 
-  return createHttpSource(
-    {
-      id: embed.running.id,
-      ...(embed.running.builtAt === undefined ? {} : { builtAt: new Date(embed.running.builtAt) }),
-    },
-    embed.endpoint ?? DEFAULT_DESCRIPTOR_ENDPOINT
-  )
+  const { builtAt, id } = embed.running
+  const running: Deployment = builtAt === undefined ? { id } : { builtAt: new Date(builtAt), id }
+
+  return createHttpSource(running, embed.endpoint ?? DEFAULT_DESCRIPTOR_ENDPOINT)
 }
 
 export function createHttpSource(

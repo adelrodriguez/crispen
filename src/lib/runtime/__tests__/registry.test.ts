@@ -1,14 +1,19 @@
-import { afterEach, describe, expect, it } from "bun:test"
+import { describe, expect, it, onTestFinished } from "vitest"
 import type { DeploymentSource } from "../../protocol/types"
 import { getDefaultMonitor, getMonitor, resetRegistry } from "../registry"
 
-afterEach(() => {
-  globalThis.__CRISPEN__ = undefined
-  resetRegistry()
-})
+function isolateRegistry(): void {
+  onTestFinished(() => {
+    globalThis.__CRISPEN__ = undefined
+    resetRegistry()
+  })
+}
 
 describe("deployment monitor registry", () => {
   it("shares one monitor per source object identity", () => {
+    expect.assertions(2)
+    isolateRegistry()
+
     const firstSource: DeploymentSource = {
       resolveTarget: () => Promise.resolve({ id: "first" }),
       running: { id: "first" },
@@ -23,6 +28,9 @@ describe("deployment monitor registry", () => {
   })
 
   it("replaces a shared monitor after it is destroyed", () => {
+    expect.assertions(1)
+    isolateRegistry()
+
     const source: DeploymentSource = {
       resolveTarget: () => Promise.resolve({ id: "first" }),
       running: { id: "first" },
@@ -35,6 +43,9 @@ describe("deployment monitor registry", () => {
   })
 
   it("starts a new weak registry when reset", () => {
+    expect.assertions(1)
+    isolateRegistry()
+
     const source: DeploymentSource = {
       resolveTarget: () => Promise.resolve({ id: "first" }),
       running: { id: "first" },
@@ -47,6 +58,9 @@ describe("deployment monitor registry", () => {
   })
 
   it("replaces the default monitor after it is destroyed", () => {
+    expect.assertions(1)
+    isolateRegistry()
+
     globalThis.__CRISPEN__ = {
       running: { id: "running" },
       v: 1,
@@ -59,6 +73,9 @@ describe("deployment monitor registry", () => {
   })
 
   it("lazily creates one default monitor from the embed", () => {
+    expect.assertions(2)
+    isolateRegistry()
+
     globalThis.__CRISPEN__ = {
       running: { id: "running" },
       v: 1,
@@ -67,6 +84,6 @@ describe("deployment monitor registry", () => {
     const monitor = getDefaultMonitor()
 
     expect(getDefaultMonitor()).toBe(monitor)
-    expect(monitor.getState().running).toEqual({ id: "running" })
+    expect(monitor.getState().running).toStrictEqual({ id: "running" })
   })
 })
