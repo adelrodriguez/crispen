@@ -32,7 +32,13 @@ A reload does not always reach the new deployment. A CDN can serve old HTML for 
 
 `reload()` records each request in session storage under the key `crispen:reload`. The record holds the running ID, the target ID, an attempt count, and a time. Crispen counts a repeated request when the running ID and the target ID are the same as in the record and less than 10 minutes have passed. The guard allows the first request and one repeated request. It blocks the next repeated request and sets `reloadStatus` to `"blocked"`.
 
-The block ends in two ways. If a later check finds a different target, `reloadStatus` returns to `"ready"`. If a page load starts on a different running deployment, the reload worked, and Crispen deletes the record.
+The block ends in three ways:
+
+- If a later check finds a different target, `reloadStatus` returns to `"ready"`.
+- If a page load starts on a different running deployment, the reload worked, and Crispen deletes the record.
+- If `reload()` runs 10 minutes or more after the last request, Crispen starts a new sequence and reloads the page. A blocked request also updates the time in the record, so each request during the block starts the 10 minutes again.
+
+A check that finds the same target does not end the block, even after 10 minutes. Keep the reload action visible in the blocked state, so the user can retry.
 
 The guard uses session storage because a reload sequence belongs to one tab. Local storage is shared between tabs, so one tab could block a valid reload in another tab. If session storage is unavailable or throws, `reloadStatus` is `"unprotected"`. `reload()` then reloads the page without the guard.
 

@@ -65,12 +65,22 @@ crispen({ endpoint: "https://deployments.example.com/current.json" })
 
 ## If `reload()` stops working
 
-If two reloads within 10 minutes land on the same old deployment, the reload guard blocks the third, and `reloadStatus` becomes `"blocked"`. Show a message for that state:
+If two reloads within 10 minutes land on the same old deployment, the reload guard blocks the third, and `reloadStatus` becomes `"blocked"`. Keep the **Reload** button in that state, and add a message:
 
 ```tsx
-if (deployment.reloadStatus === "blocked") {
-  return <p>The update is not ready yet. Try again in a few minutes.</p>
-}
+return (
+  <aside>
+    <p>A new version is available.</p>
+    {deployment.reloadStatus === "blocked" && (
+      <p>The update is not ready yet. Try again in 10 minutes.</p>
+    )}
+    <button type="button" onClick={deployment.reload}>
+      Reload
+    </button>
+  </aside>
+)
 ```
+
+A click 10 minutes or more after the last click reloads the page again. A click before that stays blocked and starts the 10 minutes again.
 
 [The reload guard stops reload loops](../explanation/how-crispen-detects-a-stale-client.md#the-reload-guard-stops-reload-loops) explains why.
