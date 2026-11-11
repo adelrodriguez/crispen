@@ -1,3 +1,6 @@
+> [!IMPORTANT]
+> `crispen` has moved to [`@sanely/skew`](https://www.npmjs.com/package/@sanely/skew). Its code now lives in [adelrodriguez/sanely](https://github.com/adelrodriguez/sanely/tree/main/packages/skew). This repository is archived, and `crispen` is deprecated on npm.
+
 <div align="center">
   <h1 align="center">🥬 <code>crispen</code></h1>
 
